@@ -209,13 +209,13 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 
 		startIndex = endIndex
 
-		if err = me.Connection.BuildRequest(request); err != nil {
+		if err = me.Client.BuildRequest(request); err != nil {
 			logger.Error(me.Prefix, "build request: %v", err)
 			//break?
 			return nil, err
 		}
 
-		response, rd, pd, err := me.Connection.InvokeWithTimers()
+		response, rd, pd, err := me.Client.InvokeWithTimers()
 		if err != nil {
 
 			if strings.Contains(err.Error(), "resource limit exceeded") && me.batchSize > 100 {
@@ -230,8 +230,6 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 		apiT += rd
 		parseT += pd
 		batchCount++
-
-		response.Print(0) // DEBUG
 
 		// fetch instances
 		instances := response.GetChildS("instances")
@@ -569,11 +567,11 @@ func (me *ZapiPerf) PollCounter() (*matrix.Matrix, error) {
 	request = node.NewXmlS("perf-object-counter-list-info")
 	request.NewChildS("objectname", me.Query)
 
-	if err = me.Connection.BuildRequest(request); err != nil {
+	if err = me.Client.BuildRequest(request); err != nil {
 		return nil, err
 	}
 
-	if response, err = me.Connection.Invoke(); err != nil {
+	if response, err = me.Client.Invoke(); err != nil {
 		return nil, err
 	}
 

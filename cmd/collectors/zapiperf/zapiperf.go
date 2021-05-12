@@ -29,7 +29,7 @@ const (
 const BILLION = 1000000000
 
 type ZapiPerf struct {
-	*zapi.Zapi      // provides: AbstractCollector, Connection, Object, Query, TemplateFn, TemplateType
+	*zapi.Zapi      // provides: AbstractCollector, Client, Object, Query, TemplateFn, TemplateType
 	object          string
 	batchSize       int
 	latencyIoReqd   int
@@ -344,12 +344,14 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 
 				// special case for workload_detail
 
-				if (me.Query == "workload_detail" || me.Query == "workload_detail_volume") && (name == "wait_time" || name == "service_time") {
-					if err := resourceCounter.AddValueString(instance, value); err != nil {
-						logger.Error(me.Prefix, "add resource counter (%s) value [%s]: %v", name, value, err)
-					} else {
-						logger.Trace(me.Prefix, "++ metric (%s) = [%s%s%s]", name, color.Blue, value, color.End)
-						count++
+				if me.Query == "workload_detail" || me.Query == "workload_detail_volume" {
+					if name == "wait_time" || name == "service_time" {
+						if err := resourceCounter.AddValueString(instance, value); err != nil {
+							logger.Error(me.Prefix, "add resource counter (%s) value [%s]: %v", name, value, err)
+						} else {
+							logger.Trace(me.Prefix, "++ metric (%s) = [%s%s%s]", name, color.Blue, value, color.End)
+							count++
+						}
 					}
 					continue
 				}
@@ -357,13 +359,15 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 				// store as scalar metric
 				if metric := newData.GetMetric(name); metric != nil {
 
+					/*
 					if me.Query == "workload_detail" || me.Query == "workload_detail_volume" {
 						err = metric.AddValueString(instance, value)
 					} else {
 						err = metric.SetValueString(instance, value)
 					}
+					*/
 
-					if err != nil {
+					if err = metric.SetValueString(instance, value); err != nil {
 						logger.Error(me.Prefix, "set metric (%s) value [%s]: %v", name, value, err)
 					} else {
 						logger.Trace(me.Prefix, "+ metric (%s) = [%s%s%s]", name, color.Cyan, value, color.End)
@@ -677,7 +681,7 @@ func (me *ZapiPerf) PollCounter() (*matrix.Matrix, error) {
 	if me.Query == "workload" || me.Query == "workload_detail" {
 
 		if me.Query == "workload_detail" {
-			if !oldMetrics.Pop("service_time") && !oldMetrics.Pop("wait_time") {
+			if !oldMetrics.Delete("service_time") && !oldMetrics.Delete("wait_time") {
 				return nil, errors.New(errors.MISSING_PARAM, "counter service_time or wait_time")
 			}
 
@@ -926,11 +930,11 @@ func (me *ZapiPerf) PollInstance() (*matrix.Matrix, error) {
 	uuidAttr = "uuid"
 
 	// hack work workload objects: get instances from Zapi
-	if me.Query == "workload" || me.Query == "workload_detail" || me.Query == "workload_volume" {
+	if me.Query == "workload" || me.Query == "workload_detail" || me.Query == "workload_volume" || me.Query == "workload_detail_volume" {
 		request = node.NewXmlS("qos-workload-get-iter")
 		queryElem := request.NewChildS("query", "")
 		infoElem := queryElem.NewChildS("qos-workload-info", "")
-		if me.Query == "workload_volume" {
+		if me.Query == "workload_volume" || me.Query == "workload_detail_volume" {
 			infoElem.NewChildS("workload-class", "autovolume")
 		} else {
 			infoElem.NewChildS("workload-class", "user-defined")
@@ -940,7 +944,7 @@ func (me *ZapiPerf) PollInstance() (*matrix.Matrix, error) {
 		nameAttr = "workload-name"
 		uuidAttr = "workload-uuid"
 	// syntax for cdot/perf
-	} else if me.Connection.IsClustered() {
+	} else if me.Client.IsClustered() {
 		request = node.NewXmlS("perf-object-instance-list-info-iter")
 		request.NewChildS("objectname", me.Query)
 		instancesAttr = "attributes-list"
@@ -951,7 +955,7 @@ func (me *ZapiPerf) PollInstance() (*matrix.Matrix, error) {
 		instancesAttr = "instances"
 	}
 
-	if me.Connection.IsClustered() {
+	if me.Client.IsClustered() {
 		request.NewChildS("max-records", strconv.Itoa(me.batchSize))
 	}
 
@@ -959,7 +963,7 @@ func (me *ZapiPerf) PollInstance() (*matrix.Matrix, error) {
 
 	for {
 
-		if results, batchTag, err = me.Connection.InvokeBatchRequest(request, batchTag); err != nil {
+		if results, batchTag, err = me.Client.InvokeBatchRequest(request, batchTag); err != nil {
 			logger.Error(me.Prefix, "instance request: %v", err)
 			break
 		}

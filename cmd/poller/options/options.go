@@ -16,6 +16,7 @@ import (
 	"goharvest2/cmd/harvest/version"
 	"goharvest2/pkg/argparse"
 	"goharvest2/pkg/config"
+	"goharvest2/pkg/errors"
 	"os"
 	"path"
 	"strings"
@@ -26,18 +27,18 @@ type Options struct {
 	Daemon bool   // if true, Poller is started as daemon
 	Debug  bool   // if true, Poller is started in debug mode
 	// this mostly means that no data will be exported
-	PrometheusPort string   // HTTP port that is assigned to Poller and can be used by the Prometheus exporter
-	Config         string   // filename of Harvest config (e.g. "harvest.yml")
-	ConfPath       string   // path to config directory (usually "/etc/harvest")
-	HomePath       string   // path to harvest home (usually "/opt/harvest")
-	LogPath        string   // log files location (usually "/var/log/harvest")
-	PidPath        string   // pid files location (usually "/var/run/harvest")
-	LogLevel       int      // logging level, 0 for trace, 5 for fatal
-	Version        string   // harvest version
-	Hostname       string   // hostname of the machine harvest is running
-	Collectors     []string // name of collectors to load (override poller config)
-	Objects        []string // objects to load (overrides collector config)
-	Profiling      int      // in case of profiling, the HTTP port used to display results
+	PromPort   string   // HTTP port that is assigned to Poller and can be used by the Prometheus exporter
+	Config     string   // filename of Harvest config (e.g. "harvest.yml")
+	ConfPath   string   // path to config directory (usually "/etc/harvest")
+	HomePath   string   // path to harvest home (usually "/opt/harvest")
+	LogPath    string   // log files location (usually "/var/log/harvest")
+	PidPath    string   // pid files location (usually "/var/run/harvest")
+	LogLevel   int      // logging level, 0 for trace, 5 for fatal
+	Version    string   // harvest version
+	Hostname   string   // hostname of the machine harvest is running
+	Collectors []string // name of collectors to load (override poller config)
+	Objects    []string // objects to load (overrides collector config)
+	Profiling  int      // in case of profiling, the HTTP port used to display results
 }
 
 // String provides a string representation of Options
@@ -47,7 +48,7 @@ func (o *Options) String() string {
 		fmt.Sprintf("%s = %v", "Daemon", o.Daemon),
 		fmt.Sprintf("%s = %v", "Debug", o.Debug),
 		fmt.Sprintf("%s = %d", "Profiling", o.Profiling),
-		fmt.Sprintf("%s = %s", "PrometheusPort", o.PrometheusPort),
+		fmt.Sprintf("%s = %s", "PromPort", o.PromPort),
 		fmt.Sprintf("%s = %d", "LogLevel", o.LogLevel),
 		fmt.Sprintf("%s = %s", "HomePath", o.HomePath),
 		fmt.Sprintf("%s = %s", "ConfPath", o.ConfPath),
@@ -66,8 +67,9 @@ func (o *Options) Print() {
 }
 
 // Get retrieves options from CLI flags, env variables and defaults
-func Get() (*Options, string) {
+func Get() (*Options, string, error) {
 	var args Options
+	var err error
 	args = Options{}
 
 	// set defaults
@@ -79,9 +81,11 @@ func Get() (*Options, string) {
 		args.Hostname = hostname
 	}
 
-	args.HomePath = config.GetHarvestConf()
+	args.HomePath = config.GetHarvestHome()
 
-	args.ConfPath = config.GetHarvestConf()
+	if args.ConfPath, err = config.GetHarvestConf(); err != nil {
+		return &args, args.Poller, err
+	}
 
 	if args.LogPath = os.Getenv("HARVEST_LOGS"); args.LogPath == "" {
 		args.LogPath = "/var/log/harvest/"
@@ -99,17 +103,19 @@ func Get() (*Options, string) {
 	parser.Bool(&args.Daemon, "daemon", "", "Start as daemon")
 	parser.Int(&args.LogLevel, "loglevel", "l", "Logging level (0=trace, 1=debug, 2=info, 3=warning, 4=error, 5=critical)")
 	parser.Int(&args.Profiling, "profiling", "", "If profiling port > 0, enables profiling via locahost:PORT/debug/pprof/")
-	parser.String(&args.Config, "conf", "", "Custom config filepath (default: "+args.Config+")")
+	parser.String(&args.PromPort, "promPort", "", "Prometheus Port")
+	parser.String(&args.Config, "config", "", "Custom config filepath (default: "+args.Config+")")
 	parser.Slice(&args.Collectors, "collectors", "c", "Only start these collectors (overrides harvest.yml)")
 	parser.Slice(&args.Objects, "objects", "o", "Only start these objects (overrides collector config)")
 
 	parser.SetHelpFlag("help")
-	parser.ParseOrExit()
+	parser.ParseOrExit() // if we are daemon arguments should be always correct
+	parser.PrintValues()
 
 	if args.Poller == "" {
-		fmt.Println("Missing required argument: poller")
-		os.Exit(1)
+		err = errors.New(errors.ERR_CONFIG, "Missing required argument: poller")
+		return &args, args.Poller, err
 	}
 
-	return &args, args.Poller
+	return &args, args.Poller, err
 }

@@ -42,17 +42,25 @@ type options struct {
 	config     string
 	profiling  bool
 	longStatus bool
+	promPort   int
 }
 
 type pollerStatus struct {
 	status        string
 	pid           int
 	profilingPort string
+	promPort      string
 }
 
 func Run() {
+	var err error
+
 	HarvestHomePath = config.GetHarvestHome()
-	HarvestConfPath = config.GetHarvestConf()
+	HarvestConfPath, err = config.GetHarvestConf()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 
 	if HarvestPidPath = os.Getenv("HARVEST_PIDS"); HarvestPidPath == "" {
 		HarvestPidPath = "/var/run/harvest/"
@@ -66,9 +74,13 @@ func Run() {
 
 	// parse user-defined options
 	parser := argparse.New("Harvest Manager", "harvest", "manage your pollers")
-	parser.SetOffset(1)
 	parser.SetHelpFlag("help")
-	parser.SetHelpFlag("manager")
+	// if user runs "harvest manager..", skip keyword "manager"
+	if len(os.Args) > 1 && os.Args[1] == "manager" {
+		parser.SetOffset(2)
+	} else {
+		parser.SetOffset(1)
+	}
 
 	parser.PosString(
 		&opts.command,
@@ -153,6 +165,13 @@ func Run() {
 		"If true enables profiling via locahost:PORT/debug/pprof/",
 	)
 
+	parser.Int(
+		&opts.promPort,
+		"promPort",
+		"",
+		"HTTP port to use for Prometheus scrapping (overrides harvest.yml)",
+	)
+
 	// exit if user asked for help or invalid options
 	parser.ParseOrExit()
 
@@ -209,7 +228,7 @@ func Run() {
 			fmt.Println("set debug mode ON (starting poller in foreground otherwise is unsafe)")
 		}
 		p := pollers.GetChildren()[0]
-		startPoller(p.GetNameS(), opts)
+		startPoller(p.GetNameS(), getPollerPrometheusPort(p, opts), opts)
 		os.Exit(0)
 	}
 
@@ -225,30 +244,30 @@ func Run() {
 
 		name := p.GetNameS()
 		datacenter := p.GetChildContentS("datacenter")
-		port := p.GetChildContentS("prometheus_port")
-
-		if opts.command == "kill" {
-			s = killPoller(name)
-			printStatus(opts.longStatus, c1, c2, datacenter, name, port, s)
-			continue
-		}
+		promPort := getPollerPrometheusPort(p, opts)
 
 		s = getStatus(name)
 
+		if opts.command == "kill" {
+			s = killPoller(name)
+			printStatus(opts.longStatus, c1, c2, datacenter, name, s.promPort, s)
+			continue
+		}
+
 		if opts.command == "status" {
-			printStatus(opts.longStatus, c1, c2, datacenter, name, port, s)
+			printStatus(opts.longStatus, c1, c2, datacenter, name, s.promPort, s)
 		}
 
 		if opts.command == "stop" || opts.command == "restart" {
 			s = stopPoller(name)
-			printStatus(opts.longStatus, c1, c2, datacenter, name, port, s)
+			printStatus(opts.longStatus, c1, c2, datacenter, name, s.promPort, s)
 		}
 
 		if opts.command == "start" || opts.command == "restart" {
 			// only start poller if confirmed that it's not running
 			if s.status == "not running" || s.status == "stopped" {
-				s = startPoller(name, opts)
-				printStatus(opts.longStatus, c1, c2, datacenter, name, port, s)
+				s = startPoller(name, promPort, opts)
+				printStatus(opts.longStatus, c1, c2, datacenter, name, s.promPort, s)
 			} else {
 				fmt.Printf("can't verify status of [%s]: kill poller and try again\n", name)
 			}
@@ -330,6 +349,14 @@ func getStatus(pollerName string) *pollerStatus {
 				matches := r.FindStringSubmatch(cmdline)
 				if len(matches) > 0 {
 					s.profilingPort = matches[1]
+				}
+			}
+
+			if strings.Contains(cmdline, "--promPort") {
+				r := regexp.MustCompile(`--promPort (\d+)`)
+				matches := r.FindStringSubmatch(cmdline)
+				if len(matches) > 0 {
+					s.promPort = matches[1]
 				}
 			}
 		}
@@ -456,21 +483,23 @@ func stopPoller(pollerName string) *pollerStatus {
 	return s
 }
 
-func startPoller(pollerName string, opts *options) *pollerStatus {
+func startPoller(pollerName string, promPort string, opts *options) *pollerStatus {
 
-	argv := make([]string, 5)
+	argv := make([]string, 7)
 	argv[0] = path.Join(HarvestHomePath, "bin", "poller")
 	argv[1] = "--poller"
 	argv[2] = pollerName
 	argv[3] = "--loglevel"
 	argv[4] = strconv.Itoa(opts.loglevel)
+	argv[5] = "--promPort"
+	argv[6] = promPort
 
 	if opts.debug {
 		argv = append(argv, "--debug")
 	}
 
 	if opts.config != path.Join(HarvestConfPath, "harvest.yml") {
-		argv = append(argv, "--conf")
+		argv = append(argv, "--config")
 		argv = append(argv, opts.config)
 	}
 
@@ -579,37 +608,37 @@ func cleanPidFile(pollerName string) bool {
 }
 
 // print status of poller, first two arguments are column lengths
-func printStatus(long bool, c1, c2 int, dc, pn, prometheusPort string, s *pollerStatus) {
+func printStatus(long bool, c1, c2 int, dc, pn, promPort string, s *pollerStatus) {
 	fmt.Printf("%s%s ", dc, strings.Repeat(" ", c1-len(dc)))
 	fmt.Printf("%s%s ", pn, strings.Repeat(" ", c2-len(pn)))
 	if long {
 		if s.pid == 0 {
-			fmt.Printf("%-10s %-10s %-10s %-20s\n", "", prometheusPort, s.profilingPort, s.status)
+			fmt.Printf("%-10s %-15s %-10s %-20s\n", "", promPort, s.profilingPort, s.status)
 		} else {
-			fmt.Printf("%-10d %-10s %-10s %-20s\n", s.pid, prometheusPort, s.profilingPort, s.status)
+			fmt.Printf("%-10d %-15s %-10s %-20s\n", s.pid, promPort, s.profilingPort, s.status)
 		}
 	} else if s.pid == 0 {
-		fmt.Printf("%-10s %-10s %-20s\n", "", prometheusPort, s.status)
+		fmt.Printf("%-10s %-15s %-20s\n", "", promPort, s.status)
 	} else {
-		fmt.Printf("%-10d %-10s %-20s\n", s.pid, prometheusPort, s.status)
+		fmt.Printf("%-10d %-15s %-20s\n", s.pid, promPort, s.status)
 	}
 }
 
 func printHeader(long bool, c1, c2 int) {
 	fmt.Printf("Datacenter%s Poller%s ", strings.Repeat(" ", c1-10), strings.Repeat(" ", c2-6))
 	if long {
-		fmt.Printf("%-10s %-10s %-10s %-20s\n", "PID", "Port", "Profiling", "Status")
+		fmt.Printf("%-10s %-15s %-10s %-20s\n", "PID", "PromPort", "Profiling", "Status")
 	} else {
-		fmt.Printf("%-10s %-10s %-20s\n", "PID", "Port", "Status")
+		fmt.Printf("%-10s %-15s %-20s\n", "PID", "PromPort", "Status")
 	}
 }
 
 func printBreak(long bool, c1, c2 int) {
 	fmt.Printf("%s %s ", strings.Repeat("+", c1), strings.Repeat("+", c2))
 	if long {
-		fmt.Println("++++++++++ ++++++++++ ++++++++++ ++++++++++++++++++++")
+		fmt.Println("++++++++++ +++++++++++++++ ++++++++++ ++++++++++++++++++++")
 	} else {
-		fmt.Println("++++++++++ ++++++++++ ++++++++++++++++++++")
+		fmt.Println("++++++++++ +++++++++++++++ ++++++++++++++++++++")
 	}
 
 }
@@ -640,4 +669,20 @@ func freePort() (int, error) {
 	}
 	defer dial.Close()
 	return dial.Addr().(*net.TCPAddr).Port, nil
+}
+
+func getPollerPrometheusPort(p *node.Node, opts *options) string {
+	var promPort string
+	var err error
+	// check first if poller argument has promPort defined
+	// else in exporter config of poller
+	if opts.promPort != 0 {
+		promPort = strconv.Itoa(opts.promPort)
+	} else {
+		promPort, err = config.GetPrometheusExporterPorts(p, opts.config)
+		if err != nil {
+			promPort = "error"
+		}
+	}
+	return promPort
 }

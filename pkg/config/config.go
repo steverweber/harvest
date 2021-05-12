@@ -4,7 +4,6 @@
 package config
 
 import (
-	"fmt"
 	"goharvest2/pkg/errors"
 	"goharvest2/pkg/tree"
 	"goharvest2/pkg/tree/node"
@@ -97,21 +96,21 @@ func GetPoller(config_fp, poller_name string) (*node.Node, error) {
 This method is used to initialize the default location to find the yml config file. If you start Harvest with the --config option it will override the value returned from this method.
 else return parent directory of executable. For example : harvest binary is in /opt/harvest/bin. This method will return /opt/harvest
 */
-func GetHarvestConf() string {
+func GetHarvestConf() (string, error) {
 	var confPath string
+	var err error
 	if confPath = os.Getenv("HARVEST_CONF"); confPath == "" {
 		configFileName := "harvest.yml"
 		path, _ := os.Executable()
 		exPath := filepath.Dir(filepath.Dir(path))
-		if _, err := os.Stat(exPath + string(os.PathSeparator) + configFileName); os.IsNotExist(err) {
-			fmt.Printf("Config file %s does not exist at %s\n", configFileName, exPath)
-			os.Exit(1)
+		if _, err = os.Stat(exPath + string(os.PathSeparator) + configFileName); os.IsNotExist(err) {
+			err = errors.New(errors.ERR_CONFIG, "Config file ["+configFileName+"] does not exist at ["+exPath+"] ")
 		} else {
 			confPath = exPath
 		}
 	}
 	//fmt.Printf("Config file %s read from %s\n", configFileName, confPath)
-	return confPath
+	return confPath, err
 }
 
 /*
@@ -127,4 +126,52 @@ func GetHarvestHome() string {
 	}
 	//fmt.Printf("Harvest path %s\n", homePath)
 	return homePath
+}
+
+/*
+This method returns port configured in prometheus exporter for given poller
+If there are more than 1 exporter configured for a poller then return string will have ports as comma seperated
+*/
+func GetPrometheusExporterPorts(p *node.Node, configFp string) (string, error) {
+	var port string
+	exporters := p.GetChildS("exporters")
+	if exporters != nil {
+		exportChildren := exporters.GetAllChildContentS()
+		definedExporters, err := GetExporters(configFp)
+		if err != nil {
+			return "", err
+		}
+		for _, ec := range exportChildren {
+			exporterType := definedExporters.GetChildS(ec).GetChildContentS("exporter")
+			if exporterType == "Prometheus" {
+				currentPort := definedExporters.GetChildS(ec).GetChildContentS("port")
+				port = currentPort
+			}
+		}
+	}
+	return port, nil
+}
+
+// Returns unique type of exporters for the poller
+// For example: If 2 prometheus exporters are configured for a poller then last one defined is returned
+func GetUniqueExporters(p *node.Node, configFp string) ([]string, error) {
+	var resultExporters []string
+	exporters := p.GetChildS("exporters")
+	if exporters != nil {
+		exportChildren := exporters.GetAllChildContentS()
+		definedExporters, err := GetExporters(configFp)
+		if err != nil {
+			return nil, err
+		}
+		exporterMap := make(map[string]string)
+		for _, ec := range exportChildren {
+			exporterType := definedExporters.GetChildS(ec).GetChildContentS("exporter")
+			exporterMap[exporterType] = ec
+		}
+
+		for _, value := range exporterMap {
+			resultExporters = append(resultExporters, value)
+		}
+	}
+	return resultExporters, nil
 }

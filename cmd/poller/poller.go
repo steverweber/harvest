@@ -102,7 +102,11 @@ func (me *Poller) Init() error {
 	var err error
 
 	// read options
-	me.options, me.name = options.Get()
+	me.options, me.name, err = options.Get()
+	if err != nil {
+		logger.Error(me.prefix, "error: %s", err.Error())
+		return err
+	}
 
 	// use prefix for logging
 	me.prefix = "(poller) (" + me.name + ")"
@@ -184,11 +188,6 @@ func (me *Poller) Init() error {
 	// initialize our metadata, the metadata will host status of our
 	// collectors and exporters, as well as ping stats to target host
 	me.load_metadata()
-
-	// Prometheus port used to be defined in the exporter parameters as a range
-	// this leads to rarely happening bugs, so we will transition to definig
-	// the port at the poller-level
-	me.options.PrometheusPort = me.params.GetChildContentS("prometheus_port")
 
 	if me.exporter_params, err = config.GetExporters(me.options.Config); err != nil {
 		logger.Warn(me.prefix, "read exporter params: %v", err)
@@ -491,9 +490,9 @@ func (me *Poller) load_collector(class, object string) error {
 	// throw warning for deprecated collectors
 	if r, d := _DEPRECATED_COLLECTORS[strings.ToLower(class)]; d {
 		if r != "" {
-			logger.Warn(me.prefix, "collector (%s) is depracated, please use (%s) instead", class, r)
+			logger.Warn(me.prefix, "collector (%s) is deprecated, please use (%s) instead", class, r)
 		} else {
-			logger.Warn(me.prefix, "collector (%s) is depracated, see documentation for help", class)
+			logger.Warn(me.prefix, "collector (%s) is deprecated, see documentation for help", class)
 		}
 	}
 
@@ -561,6 +560,10 @@ func (me *Poller) load_collector(class, object string) error {
 			col = NewFunc(collector.New(class, object.GetNameS(), me.options, template.Copy()))
 			if err = col.Init(); err != nil {
 				logger.Warn(me.prefix, "init collector-object (%s:%s): %v", class, object.GetNameS(), err)
+				if errors.IsErr(err, errors.ERR_CONNECTION) {
+					logger.Warn(me.prefix, "aborting collector (%s)", class)
+					break
+				}
 			} else {
 				collectors = append(collectors, col)
 				logger.Debug(me.prefix, "initialized collector-object (%s:%s)", class, object.GetNameS())
@@ -579,7 +582,8 @@ func (me *Poller) load_collector(class, object string) error {
 		name := col.GetName()
 		obj := col.GetObject()
 
-		for _, exp_name := range col.WantedExporters() {
+		for _, exp_name := range col.WantedExporters(me.options.Config) {
+			logger.Trace(me.prefix, "exp_name %s", exp_name)
 			if exp := me.load_exporter(exp_name); exp != nil {
 				col.LinkExporter(exp)
 				logger.Debug(me.prefix, "linked (%s:%s) to exporter (%s)", name, obj, exp_name)
@@ -700,13 +704,11 @@ func (me *Poller) load_metadata() {
 // start poller, if fails try to write to syslog
 func main() {
 
-	var err error
-
 	// don't recover if a goroutine has paniced, instead
 	// try to log as much as possible, since normally it's
 	// not properly logged
 	defer func() {
-		logger.Warn("(main) ", "defer func here")
+		//logger.Warn("(main) ", "defer func here")
 		if r := recover(); r != nil {
 			syslogger, err := syslog.NewLogger(syslog.LOG_ERR|syslog.LOG_DAEMON, logger.LOG_FLAGS)
 			if err == nil {
@@ -715,7 +717,7 @@ func main() {
 			// if logger still abailable try to write there as well
 			// do this last, since might make us panic as again
 			logger.Fatal("(main) ", "%v", r)
-			logger.Fatal("(main) ", "terminating abnormally, tip: run in foreground mode to debug")
+			logger.Fatal("(main) ", "terminating abnormally, tip: run in foreground mode (with \"--loglevel 0\") to debug")
 
 			os.Exit(1)
 		}
@@ -723,8 +725,8 @@ func main() {
 
 	poller := New()
 
-	if err = poller.Init(); err != nil {
-		logger.Fatal("(main)", "failed to start poller: %v", err)
+	if poller.Init() != nil {
+		// error already logger by poller
 		poller.Stop()
 		os.Exit(1)
 	}

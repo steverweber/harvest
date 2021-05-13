@@ -18,7 +18,6 @@ import (
 	"goharvest2/pkg/config"
 	"goharvest2/pkg/errors"
 	"os"
-	"path"
 	"strings"
 )
 
@@ -28,8 +27,7 @@ type Options struct {
 	Debug  bool   // if true, Poller is started in debug mode
 	// this mostly means that no data will be exported
 	PromPort   string   // HTTP port that is assigned to Poller and can be used by the Prometheus exporter
-	Config     string   // filename of Harvest config (e.g. "harvest.yml")
-	ConfPath   string   // path to config directory (usually "/etc/harvest")
+	Config     string   // filepath of Harvest config (defaults to "harvest.yml") can be relative or absolute path
 	HomePath   string   // path to harvest home (usually "/opt/harvest")
 	LogPath    string   // log files location (usually "/var/log/harvest")
 	PidPath    string   // pid files location (usually "/var/run/harvest")
@@ -51,7 +49,6 @@ func (o *Options) String() string {
 		fmt.Sprintf("%s = %s", "PromPort", o.PromPort),
 		fmt.Sprintf("%s = %d", "LogLevel", o.LogLevel),
 		fmt.Sprintf("%s = %s", "HomePath", o.HomePath),
-		fmt.Sprintf("%s = %s", "ConfPath", o.ConfPath),
 		fmt.Sprintf("%s = %s", "LogPath", o.LogPath),
 		fmt.Sprintf("%s = %s", "PidPath", o.PidPath),
 		fmt.Sprintf("%s = %s", "Config", o.Config),
@@ -81,9 +78,9 @@ func Get() (*Options, string, error) {
 		args.Hostname = hostname
 	}
 
-	args.HomePath = config.GetHarvestHome()
+	args.HomePath = config.GetHarvestHomePath()
 
-	if args.ConfPath, err = config.GetHarvestConf(); err != nil {
+	if args.Config, err = config.GetDefaultHarvestConfigPath(); err != nil {
 		return &args, args.Poller, err
 	}
 
@@ -93,8 +90,6 @@ func Get() (*Options, string, error) {
 	if args.PidPath = os.Getenv("HARVEST_PIDS"); args.PidPath == "" {
 		args.PidPath = "/var/run/harvest/"
 	}
-
-	args.Config = path.Join(args.ConfPath, "harvest.yml")
 
 	// parse from command line
 	parser := argparse.New("Harvest Poller", "poller", "Runs collectors and exporters for a target system")

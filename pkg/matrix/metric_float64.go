@@ -157,8 +157,8 @@ func (me *MetricFloat64) AddValueFloat64(i *Instance, n float64) error {
 func (me *MetricFloat64) AddValueString(i *Instance, v string) error {
 	var (
 		x, n float64
-		err error
-		has bool
+		err  error
+		has  bool
 	)
 	if x, err = strconv.ParseFloat(v, 64); err != nil {
 		return err

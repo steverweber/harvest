@@ -27,7 +27,7 @@ Harvest is compatible with:
 
 # Installation / Upgrade
 
-We provide pre-compiled binaries for Linux, RPMs and Debs.
+We provide pre-compiled binaries for Linux, RPMs, and Debs.
 
 ## Pre-compiled Binaries
 Download the latest version of [Harvest](https://github.com/NetApp/harvest/releases/latest) from the releases tab and extract it.
@@ -57,11 +57,11 @@ sudo apt install harvest.deb
 
 ## Docker
 
-WIP. Coming soon
+Work in progress. Coming soon
 
 ## Building from source
 
-To build Harvest from source code, first make sure you have a working Go environment with [version 1.15 or greater installed](https://golang.org/doc/install). You'll also need an Internet connection to install go dependencies. If you need to build from an air-gapped machine, use `go mod vendor` from an Internet connected machine first and then copy the `vendor` directory to the air-gapped machine.
+To build Harvest from source code, first make sure you have a working Go environment with [version 1.15 or greater installed](https://golang.org/doc/install). You'll also need an Internet connection to install go dependencies. If you need to build from an air-gapped machine, use `go mod vendor` from an Internet connected machine first, and then copy the `vendor` directory to the air-gapped machine.
 
 Clone the repo and build everything.
 
@@ -85,11 +85,11 @@ Harvest's configuration information is defined in `harvest.yml`. There are a few
 
 To start collecting metrics, you need to define at least one `poller` and one `exporter` in your  configuration file. The default configuration comes with a pre-configured poller named `unix` which collects metrics from the local system. This is useful if you want to monitor resource usage by Harvest and serves as a good example. Feel free to delete it if you want.
 
-The next step is to add pollers for your ONTAP clusters in the [Pollers](#pollers) section of the configuration file. Refer to the [Harvest Configuration] Section(#harvest-configuration) for more details.
+The next step is to add pollers for your ONTAP clusters in the [Pollers](#pollers) section of the configuration file. Refer to the [Harvest Configuration](#harvest-configuration) Section for more details.
 
 ## 2. Start Harvest
 
-Start *all* Harvest pollers as daemons:
+Start all Harvest pollers as daemons:
 
 ```bash
 $ bin/harvest start
@@ -101,29 +101,19 @@ Or start a specific poller(s):
 $ bin/harvest start jamaica grenada
 ```
 
-(replace `jamaica` and `grenada` with the poller names that you defined in `harvest.yml`). The logs of each poller can be found in `/var/log/harvest/`.
+Replace `jamaica` and `grenada` with the poller names you defined in `harvest.yml`. The logs of each poller can be found in `/var/log/harvest/`.
 
 ## 3. Import Grafana dashboards
 
-The Grafana dashboards are located in the `grafana` directory. You can manually import the dashboards or use the `harvest grafana` utility. The utility requires the address (hostname or IP), port of the Grafana server, and a Grafana API token. The port can be omitted if Grafana is configured to redirect the URL. Use the `-d` flag to point to the directory that contains the dashboards.
+The Grafana dashboards are located in the `$HARVEST_HOME/grafana` directory. You can manually import the dashboards or use the `harvest grafana` command ([more documentation](cmd/tools/grafana/README.md)).
 
-### Grafana API token
-
-The utility tool asks for an API token which can be generated from the Grafana web-gui. Click on `Configuration` in the left menu bar (1), click on `API Keys` (2) and click on the `New API Key` button. Choose a Key name (3), choose `Editor` for role (4) and click on add (5). Copy the generated key and paste it in your terminal or addd the token to the `Tools` section of your configuration file. (see below)
-
-For example, let's say your Grafana server is on `http://my.grafana.server:3000` and you want to import the Prometheus-based dashboards from the `grafana` directory. You would run this:
-
-```
-$ bin/grafana import --addr my.grafana.server:3000 --directory grafana/prometheus
-```
-
-By default the dashboards are connected to the `Prometheus` datasource defined in Grafana. If your datasource has a different name, use the `--datasource` flag during import.
+Note: the current dashboards specify Prometheus as the datasource. If you use the InfluxDB exporter, you will need to create your own dashboards.
 
 ## 4. Verify the metrics
 
 If you use a Prometheus Exporter, open a browser and navigate to [http://0.0.0.0:12990/](http://0.0.0.0:12990/) (replace `12990` with the port number of your poller). This is the Harvest created HTTP end-point for your Prometheus exporter. This page provides a real-time generated list of running collectors and names of exported metrics. 
 
-The metric data that's exposed for Prometheus to scrap is available at [http://0.0.0.0:12990/metrics/](http://0.0.0.0:12990/metrics/). For more help on how to configure Prometheus DB, see the [Prometheus](#prometheus) section.
+The metric data that's exposed for Prometheus to scrap is available at [http://0.0.0.0:12990/metrics/](http://0.0.0.0:12990/metrics/). For more help on how to configure Prometheus DB, see the [Prometheus exporter](cmd/exporters/prometheus/README.md) documentation.
 
 If you can't access the URL, check the logs of your pollers. These are located in `/var/log/harvest/`.
 
@@ -143,14 +133,14 @@ All pollers are defined in `harvest.yml`, the main configuration file of Harvest
 | `exporters`            | **required** | list of exporter names from the `Exporters` section. Note: this should be the name of the exporter (e.g. `prometheus1`), not the value of the `exporter` key (e.g. `Prometheus`)   |                   |
 | `auth_style`           | required by Zapi* collectors |  either `basic_auth` or `certificate_auth`  | `basic_auth` |
 | `username`, `password` | required if `auth_style` is `basic_auth` |  |              |
-| `cert`, `key`          | required if `auth_style` is `certificate_auth` | certificate and key files which should be in the directory `/etc/harvest/cert/`. If these two parameters are not provided files matching the poller name will be used (for example if poller name is `jamaica` than the files should be `jamaica.key` and `jamaica.cert`).                        |              |
+| `ssl_cert`, `ssl_key`  | optional if `auth_style` is `certificate_auth` | Absolute paths to SSL (client) certificate and key used to authenticate with the target system.<br /><br />If not provided, the poller will look for `<hostname>.key` and `<hostname>.pem` in `$HARVEST_HOME/cert/`.<br/><br/>To create certificates for ONTAP systems, see the [Zapi documentation](cmd/collectors/zapi/README.md#authentication)                        |              |
 | `use_insecure_tls`     | optional, bool |  If true, disable TLS verification when connecting to ONTAP cluster  | false         |
 | `log_max_bytes`        |  | Maximum size of the log file before it will be rotated | `10000000` (10 mb) |
 | `log_max_files`        |  | Number of rotated log files to keep | `10` |
 | |  | | |
 
 ## Defaults
-This section is optional. If there are parameters identical for all your pollers (e.g. datacenter, authentication method, login preferences), they can be grouped under this section. The poller section will be checked first and then the defaults consulted.
+This section is optional. If there are parameters identical for all your pollers (e.g. datacenter, authentication method, login preferences), they can be grouped under this section. The poller section will be checked first and if the values aren't found there, the defaults will be consulted.
 
 ## Exporters
 
@@ -166,39 +156,12 @@ The following two parameters are required for all exporters:
 | Exporter name (header) | **required** | Name of the exporter instance, this is a user-defined value |              |
 | `exporter`    | **required** | Name of the exporter class (e.g. Prometheus, InfluxDB, Http) - these can be found under the `cmd/exporters/` directory           |              |
 
-Note: when we talk about *Prometheus Exporter*, *InfluxDB Exporter*, etc., we mean the Harvest modules that send the data to a database, NOT the names used to refer to the actual databases.
+Note: when we talk about the *Prometheus Exporter* or *InfluxDB Exporter*, we mean the Harvest modules that send the data to a database, NOT the names used to refer to the actual databases.
 
-### Prometheus Exporter
-***parameters:***
-| parameter     | type         | description                                                                             | default      |
-|---------------|--------------|-----------------------------------------------------------------------------------------|--------------|
-| `local_http_addr`    | optional  | Local address of the HTTP service (`localhost` or `127.0.0.1` makes the metrics accessible only on local machine, `0.0.0.0` makes it public).| `0.0.0.0` |
-| `port`               | required  | Local HTTP service port Prometheus will scrape.  |
-| `allow_addrs`        | optional, list | List of clients that can access the HTTP service, each "URL" should be a hostname or IP address. If the client is not in this list, the HTTP request will be rejected. | allow all URLs |
-| `allow_addrs_regex`  | optional, list | Same as `allow_addrs`, but client will be only allowed if it matches any of the regular expressions | allow all URLs |
-| `global_prefix`      | optional, string | globally add a prefix to all metrics, e.g settings this parameter to `netapp_`, would change the metric `cluster_status` (and all other metrics) into `netapp_cluster_status` | |
-| `cache_max_keep`     | optional, duration | How long the HTTP end-point will cache the metrics. This can be useful if Prometheus is unavailable or if it scraps Harvest less frequently than the polling interval of collectors. Examples: `10s`, `1m`, `1h`, etc| `180s` |
-| |  | |
+### [Prometheus Exporter](cmd/exporters/prometheus/README.md)
 
-Don't forget to update your Prometheus configuration and add a new target for each of the ports defined in Harvest configuration. As an example, if we defined four prometheus exporters at ports: 12990, 12991, 14567, and 14568 you need to add four sections to your `prometheus.yml`.
+### [InfluxDB Exporter](cmd/exporters/influxdb/README.md)
 
-```bash
-$ vim /etc/prometheus/prometheus.yml
-```
-
-Scroll down to near the end of file and add the following lines:
-
-```yaml
-  - job_name: 'harvest'
-    scrape_interval:     60s 
-    static_configs:
-      - targets: 
-        - 'localhost:12990'
-        - 'localhost:12991'
-        - 'localhost:14567'
-        - 'localhost:14568'
-```
-**NOTE** If Prometheus is not on the same machine as Harvest, then replace `localhost` with the IP address of your Harvest machine. Also note the scrape interval above is set to 60s. That matches the polling frequency of the default Harvest collectors. If you change the polling frequency of a Harvest collector to a lower value, you should also change the scrape interval.
 ## Tools
 
 This section is optional. You can uncomment the `grafana_api_token` key and add your Grafana API token so `harvest` does not prompt you for the key when importing dashboards.
@@ -207,3 +170,15 @@ This section is optional. You can uncomment the `grafana_api_token` key and add 
 Tools:
   #grafana_api_token: 'aaa-bbb-ccc-ddd'
 ```
+
+
+## Configuring collectors
+
+Collectors are configured by their own configuration files, which are subdirectories in [conf/](conf/). Each collector can define its own set of parameters.
+
+### [Zapi](cmd/collectors/zapi/README.md)
+
+### [ZapiPerf](cmd/collectors/zapiperf/README.md)
+
+### [Unix](cmd/collectors/unix/README.md)
+

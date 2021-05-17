@@ -27,7 +27,7 @@ override:
   - read_io_type_base: delta
 
 qos_labels:
-  - vserver
+  - vserver => svm
   - volume
   - qtree
   - lun
@@ -38,7 +38,7 @@ qos_labels:
 export_options:
   instance_keys:
     - wid
-    - vserver
+    - svm
     - volume
     - qtree
     - lun

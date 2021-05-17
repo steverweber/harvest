@@ -3,7 +3,7 @@
 
 name:                     WorkloadDetail
 query:                    workload_detail
-object:                   qos
+object:                   qos_detail
 
 instance_key:             name
 
@@ -41,7 +41,7 @@ resource_map:
 
 qos_labels:
   - name
-  - vserver
+  - vserver => svm
   - volume
   - qtree
   - lun
@@ -52,7 +52,7 @@ qos_labels:
 export_options:
   instance_keys:
     - wid
-    - vserver
+    - svm
     - volume
     - qtree
     - lun

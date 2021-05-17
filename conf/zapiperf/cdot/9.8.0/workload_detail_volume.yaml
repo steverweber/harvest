@@ -2,7 +2,7 @@
 # object provides latency breakdown per service or delay center per volume
 name:                     WorkloadDetailVolume
 query:                    workload_detail_volume
-object:                   qos_volume
+object:                   qos_detail_volume
 
 instance_key:             name
 
@@ -39,7 +39,7 @@ resource_map:
   # DISK_SSD_OTHER : 
 
 qos_labels:
-  - vserver
+  - vserver => svm
   - volume
   - qtree
   - lun
@@ -50,7 +50,7 @@ qos_labels:
 export_options:
   instance_keys:
     - wid
-    - vserver
+    - svm
     - volume
     - qtree
     - lun

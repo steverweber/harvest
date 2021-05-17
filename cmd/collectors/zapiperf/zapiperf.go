@@ -1,6 +1,27 @@
 /*
- * Copyright NetApp Inc, 2021 All rights reserved
- */
+	Copyright NetApp Inc, 2021 All rights reserved
+
+	ZapiPerf collects and processes metrics from the "perf" APIs of the
+	ZAPI protocol. This collector inherits some methods and fields of
+	the Zapi collector (as they use the same protocol). However,
+	ZapiPerf calculates final metric values from the deltas of two
+	consecutive polls.
+
+	The exact formula of doing these calculations, depends on the property
+	of each counter and some counters require a "base-counter" additionally.
+
+	Counter properties and other metadata are fetched from the target
+	system during PollCounter, therefore this collector is ONTAP-version
+	independent.
+
+	The collector also maintains a cache of instances, also updated
+	periodically with PollInstance.
+
+	The source code prioritizes performance over simlicity/readability.
+	Additionally, some objects (e.g. workloads) come with twists that
+	force the collector to do acrobatics. Don't expect to easily
+	comprehend what comes below.
+*/
 package main
 
 import (
@@ -16,6 +37,7 @@ import (
 	"strings"
 	"time"
 
+	// our parent collector
 	zapi "goharvest2/cmd/collectors/zapi/collector"
 )
 
@@ -40,11 +62,12 @@ type ZapiPerf struct {
 	isCacheEmpty    bool
 }
 
+// New returns a new ZapiPerf collector for one perf object
 func New(a *collector.AbstractCollector) collector.Collector {
-	//return &ZapiPerf{AbstractCollector: a}
 	return &ZapiPerf{Zapi: zapi.NewZapi(a)}
 }
 
+// Init initializes collector parameters and connects to target system
 func (me *ZapiPerf) Init() error {
 
 	if err := me.InitVars(); err != nil {
@@ -86,6 +109,7 @@ func (me *ZapiPerf) InitCache() error {
 	return nil
 }
 
+// load a string parameter use default
 func (me *ZapiPerf) loadParamStr(name, defaultValue string) string {
 
 	var x string
@@ -98,11 +122,14 @@ func (me *ZapiPerf) loadParamStr(name, defaultValue string) string {
 	return defaultValue
 }
 
+// load an int parameter or use default value
 func (me *ZapiPerf) loadParamInt(name string, defaultValue int) int {
 
-	var x string
-	var n int
-	var e error
+	var (
+		x string
+		n int
+		e error
+	)
 
 	if x = me.Params.GetChildContentS(name); x != "" {
 		if n, e = strconv.Atoi(x); e == nil {
@@ -116,11 +143,13 @@ func (me *ZapiPerf) loadParamInt(name string, defaultValue int) int {
 	return defaultValue
 }
 
+// PollData updates the data cache of the collector. During first poll, no data will
+// be emitted. Afterwards, final metric values will be calculated from previous poll.
 func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 
 	var (
 		instanceKeys                 []string
-		resourceLatency, resourceOps matrix.Metric
+		resourceLatency, resourceOps matrix.Metric // for workload* objects
 		err                          error
 	)
 
@@ -132,7 +161,7 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 
 	timestamp := newData.GetMetric("timestamp")
 	if timestamp == nil {
-		return nil, errors.New(errors.ERR_CONFIG, "missing timestamp metric") // @TODO errconfig??
+		return nil, errors.New(errors.MISSING_PARAM, "timestamp metric") // @TODO errconfig??
 	}
 
 	// for updating metadata
@@ -153,7 +182,6 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 		if resourceMap := me.Params.GetChildS("resource_map"); resourceMap == nil {
 			return nil, errors.New(errors.MISSING_PARAM, "resource_map")
 		} else {
-			//resourceCounters = make(map[string]matrix.Metric)
 			instanceKeys = make([]string, 0)
 			for _, layer := range resourceMap.GetAllChildNamesS() {
 				for key := range me.Matrix.GetInstances() {
@@ -173,7 +201,7 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 	requestCounters := request.NewChildS("counters", "")
 	// load scalar metrics
 	for key, m := range newData.GetMetrics() {
-		// no histograms
+		// skip histograms
 		if !m.HasLabels() {
 			requestCounters.NewChildS("counter", key)
 		}
@@ -211,7 +239,6 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 
 		if err = me.Client.BuildRequest(request); err != nil {
 			logger.Error(me.Prefix, "build request: %v", err)
-			//break?
 			return nil, err
 		}
 
@@ -288,12 +315,11 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 				continue
 			}
 
-			logger.Debug(me.Prefix, "fetching data of instance [%s]", key)
+			logger.Debug(me.Prefix, "fetching data of instance [%s] <%s>", key, instance.GetLabels().String())
 
 			// add batch timestamp as custom counter
-			err := timestamp.SetValueFloat64(instance, ts)
-			if err != nil {
-				logger.Error(me.Prefix, "error: %v", err)
+			if err := timestamp.SetValueFloat64(instance, ts); err != nil {
+				logger.Error(me.Prefix, "timestamp set value: %v", err)
 			}
 
 			for _, cnt := range counters.GetChildren() {
@@ -311,16 +337,16 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 				logger.Trace(me.Prefix, "(%s%s%s%s) parsing counter (%s) = %v", color.Grey, key, color.End, layer, name, value)
 
 				// ZAPI counter for us is either instance label (string)
-				// or numeric metric (scalar or string)
+				// or numeric metric (scalar or histogram)
 
-				// store as instance label
+				// string => instance label
 				if display, has := me.instanceLabels[name]; has {
 					instance.SetLabel(display, value)
 					logger.Trace(me.Prefix, "+ label (%s) = [%s%s%s]", display, color.Yellow, value, color.End)
 					continue
 				}
 
-				// store as array counter / histogram
+				// histogram => convert to flat metrics
 				if labels, has := me.histogramLabels[name]; has {
 
 					values := strings.Split(value, ",")
@@ -347,7 +373,6 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 				}
 
 				// special case for workload_detail
-
 				if me.Query == "workload_detail" || me.Query == "workload_detail_volume" {
 					if name == "wait_time" || name == "service_time" {
 						if err := resourceLatency.AddValueString(instance, value); err != nil {
@@ -371,6 +396,7 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 
 				// store as scalar metric
 				if metric := newData.GetMetric(name); metric != nil {
+
 					if err = metric.SetValueString(instance, value); err != nil {
 						logger.Error(me.Prefix, "set metric (%s) value [%s]: %v", name, value, err)
 					} else {
@@ -387,8 +413,17 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 		} // end loop over instances
 	} // end batch request
 
-	// terminate if serious errors
-	// @TODO handle...
+	logger.Debug(me.Prefix, "collected %d data points in %d batch polls", count, batchCount)
+
+	if me.Query == "workload_detail" || me.Query == "workload_detail_volume" {
+		if rd, pd, err := me.GetParentOpsCounters(newData, keyName); err == nil {
+			apiT += rd
+			parseT += pd
+		} else {
+			// no point to continue as we can't calculate the other counters
+			return nil, err
+		}
+	}
 
 	// update metadata
 	me.Metadata.LazySetValueInt64("api_time", "data", apiT.Microseconds())
@@ -396,15 +431,12 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 	me.Metadata.LazySetValueUint64("count", "data", count)
 	me.AddCollectCount(count)
 
-	logger.Debug(me.Prefix, "collected %d data points in %d batch polls", count, batchCount)
+	/* Uncomment to debug metric values and get huge ugly output (only in foreground mode)
+	logger.Debug(me.Prefix, ">> PREVIOUS MATRIX ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+	me.Matrix.Print()
 
-	// Useful for debugging how metrics are calculated, only visible in foreground mode
-	/*
-		logger.Debug(me.Prefix, ">> PREVIOUS MATRIX ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-		me.Matrix.Print()
-
-		logger.Debug(me.Prefix, ">>  CURRENT MATRIX ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-		newData.Print()
+	logger.Debug(me.Prefix, ">>  CURRENT MATRIX ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+	newData.Print()
 	*/
 
 	// skip calculating from delta if no data from previous poll
@@ -418,9 +450,8 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 	calcStart := time.Now()
 
 	logger.Debug(me.Prefix, "starting delta calculations from previous cache")
-	//logger.Debug(me.Prefix, "data has dimensions (%d x %d)", len(newData.Data), len(newData.Data[0]))
 
-	// cache data, to store after calculations
+	// cache raw data for next polls
 	cachedData := newData.Clone(true, true, true) // @TODO implement copy data
 
 	// order metrics, such that those requiring base counters are processed last
@@ -442,17 +473,10 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 
 	// calculate timestamp delta first since many counters require it for postprocessing
 	// timestamp has "raw" property, so won't be postprocessed automatically
-	// fmt.Printf("\npostprocessing %s%s%s - %s%v%s\n", color.Red, timestamp.Name, color.End, color.Bold, timestamp.Properties, color.End)
-	//logger.Debug(me.Prefix, "cooking [%s] (%s)", timestamp.Name, timestamp.Properties)
-	//print_vector("current", newData.Data[timestamp.Index])
-	//print_vector("previous", me.Data.Data[timestamp.Index])
 	if err = timestamp.Delta(me.Matrix.GetMetric("timestamp")); err != nil {
 		logger.Error(me.Prefix, "(timestamp) calculate delta: %v", err)
 		// @TODO terminate since other counters will be incorrect
 	}
-
-	//newData.Delta(me.Data, timestamp.Index)
-	//print_vector(color.Green+"delta"+color.End, newData.Data[timestamp.Index])
 
 	var base matrix.Metric
 
@@ -461,27 +485,28 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 		property := metric.GetProperty()
 		key := orderedKeys[i]
 
-		// raw counters don't require postprocessing
-		if property == "raw" || property == "" {
+		// RAW - submit without posprocessing
+		if property == "raw" {
 			continue
 		}
 
-		// for all the other properties we start with delta
+		// all other properties - first calculate delta
 		if err = metric.Delta(me.Matrix.GetMetric(key)); err != nil {
 			logger.Error(me.Prefix, "(%s) calculate delta: %v", key, err)
 			continue
 		}
 
+		// DELTA - subtract previous value from current
 		if property == "delta" {
 			// already done
 			continue
 		}
 
-		// rate is delta, normalized by elapsed time
+		// RATE - delta, normalized by elapsed time
 		if property == "rate" {
-			if err = metric.Divide(timestamp); err != nil {
-				logger.Error(me.Prefix, "(%s) calculate rate: %v", key, err)
-			}
+			// defer calculation, so we can first calculate averages/percents
+			// Note: calculating rate before averages are averages/percentages are calculated
+			// used to be a bug in Harvest 2.0 (Alpha, RC1, RC2) resulting in very high latency values
 			continue
 		}
 
@@ -493,11 +518,15 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 			continue
 		}
 
-		// average and percentage are calculated by dividing by the value of the base counter
+		// remaining properties: average and percent
+		//
+		// AVERAGE - delta, divided by base-counter delta
+		//
+		// PERCENT - average * 100
 		// special case for latency counter: apply minimum number of iops as threshold
 		if property == "average" || property == "percent" {
 
-			if strings.HasSuffix(metric.GetName(), "_latency") {
+			if strings.HasSuffix(metric.GetName(), "latency") {
 				err = metric.DivideWithThreshold(base, me.latencyIoReqd)
 			} else {
 				err = metric.Divide(base)
@@ -522,18 +551,155 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 		logger.Error(me.Prefix, "(%s) unknown property: %s", key, property)
 	}
 
+	// calculate rates (which we deferred to calculate averages/percents first)
+	for i, metric := range orderedMetrics {
+		if metric.GetProperty() == "rate" {
+			if err = metric.Divide(timestamp); err != nil {
+				logger.Error(me.Prefix, "(%s) calculate rate: %v", orderedKeys[i], err)
+			}
+		}
+	}
+
 	me.Metadata.LazySetValueInt64("calc_time", "data", time.Since(calcStart).Microseconds())
+
 	// store cache for next poll
 	me.Matrix = cachedData
 
-	/* DEBUG
-	logger.Debug(me.Prefix, ">> RESULTING MATRIX ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+	/* Uncomment to debug metric values
+	logger.Debug(me.Prefix, ">> RESULTING MATRIX ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 	newData.Print()
 	*/
 
 	return newData, nil
 }
 
+// Poll counter "ops" of the rlated/parent object, required for objects
+// workload_detail and workload_detail_volume. This counter is already
+// collected by the other ZapiPerf collectors, so this poll is redundant
+// (until we implement some sort of inter-collector communication).
+func (me *ZapiPerf) GetParentOpsCounters(data *matrix.Matrix, KeyAttr string) (time.Duration, time.Duration, error) {
+
+	var (
+		ops          matrix.Metric
+		object       string
+		instanceKeys []string
+		apiT, parseT time.Duration
+		err          error
+	)
+
+	if me.Query == "workload_detail" {
+		object = "workload"
+	} else {
+		object = "workload_volume"
+	}
+
+	logger.Debug(me.Prefix, "(%s) starting redundancy poll for ops from parent object (%s)", me.Query, object)
+
+	apiT = 0 * time.Second
+	parseT = 0 * time.Second
+
+	if ops = data.GetMetric("ops"); ops == nil {
+		logger.Error(me.Prefix, "ops counter not found in cache")
+		return apiT, parseT, errors.New(errors.MISSING_PARAM, "counter ops")
+	}
+
+	instanceKeys = data.GetInstanceKeys()
+
+	// build ZAPI request
+	request := node.NewXmlS("perf-object-get-instances")
+	request.NewChildS("objectname", object)
+
+	requestCounters := request.NewChildS("counters", "")
+	requestCounters.NewChildS("counter", "ops")
+
+	// batch indices
+	startIndex := 0
+	endIndex := 0
+
+	count := 0
+
+	for endIndex < len(instanceKeys) {
+
+		// update batch indices
+		endIndex += me.batchSize
+		if endIndex > len(instanceKeys) {
+			endIndex = len(instanceKeys)
+		}
+
+		logger.Debug(me.Prefix, "starting batch poll for instances [%d:%d]", startIndex, endIndex)
+
+		request.PopChildS(KeyAttr + "s")
+		requestInstances := request.NewChildS(KeyAttr+"s", "")
+		for _, key := range instanceKeys[startIndex:endIndex] {
+			requestInstances.NewChildS(KeyAttr, key)
+		}
+
+		startIndex = endIndex
+
+		if err = me.Client.BuildRequest(request); err != nil {
+			return apiT, parseT, err
+		}
+
+		response, rt, pt, err := me.Client.InvokeWithTimers()
+		if err != nil {
+			return apiT, parseT, err
+		}
+
+		apiT += rt
+		parseT += pt
+
+		// fetch instances
+		instances := response.GetChildS("instances")
+		if instances == nil || len(instances.GetChildren()) == 0 {
+			return apiT, parseT, err
+		}
+
+		for _, i := range instances.GetChildren() {
+
+			key := i.GetChildContentS(me.instanceKey)
+
+			if key == "" {
+				logger.Debug(me.Prefix, "skip instance, no key [%s] (name=%s, uuid=%s)", me.instanceKey, i.GetChildContentS("name"), i.GetChildContentS("uuid"))
+				continue
+			}
+
+			instance := data.GetInstance(key)
+			if instance == nil {
+				logger.Warn(me.Prefix, "skip instance [%s], not found in cache", key)
+				continue
+			}
+
+			counters := i.GetChildS("counters")
+			if counters == nil {
+				logger.Debug(me.Prefix, "skip instance [%s], no data counters", key)
+				continue
+			}
+
+			for _, cnt := range counters.GetChildren() {
+
+				name := cnt.GetChildContentS("name")
+				value := cnt.GetChildContentS("value")
+
+				logger.Trace(me.Prefix, "(%s%s%s%s) parsing counter = %v", color.Grey, key, color.End, name, value)
+
+				if name == "ops" {
+					if err = ops.SetValueString(instance, value); err != nil {
+						logger.Error(me.Prefix, "set metric (%s) value [%s]: %v", name, value, err)
+					} else {
+						logger.Trace(me.Prefix, "+ metric (%s) = [%s%s%s]", name, color.Cyan, value, color.End)
+						count++
+					}
+				} else {
+					logger.Error(me.Prefix, "unrequested metric (%s)", name)
+				}
+			}
+		}
+	}
+	logger.Debug(me.Prefix, "(%s) completed redundant ops poll (%s): collected %d", me.Query, object, count)
+	return apiT, parseT, nil
+}
+
+// Update counter metadata cache
 func (me *ZapiPerf) PollCounter() (*matrix.Matrix, error) {
 
 	var (
@@ -701,10 +867,11 @@ func (me *ZapiPerf) PollCounter() (*matrix.Matrix, error) {
 		// there original counters will be discarded
 		if me.Query == "workload_detail" || me.Query == "workload_detail_volume" {
 
-			var service, wait, visits matrix.Metric
+			var service, wait, visits, ops matrix.Metric
 			oldMetrics.Delete("service_time")
 			oldMetrics.Delete("wait_time")
 			oldMetrics.Delete("visits")
+			oldMetrics.Delete("ops")
 
 			if service = me.Matrix.GetMetric("service_time"); service == nil {
 				logger.Error(me.Prefix, "metric [service_time] required to calculate workload missing")
@@ -720,6 +887,14 @@ func (me *ZapiPerf) PollCounter() (*matrix.Matrix, error) {
 
 			if service == nil || wait == nil || visits == nil {
 				return nil, errors.New(errors.MISSING_PARAM, "workload metrics")
+			}
+
+			if ops = me.Matrix.GetMetric("ops"); ops == nil {
+				if ops, err = me.Matrix.NewMetricFloat64("ops"); err != nil {
+					return nil, err
+				}
+				ops.SetProperty(visits.GetProperty())
+				logger.Debug(me.Prefix, "+ [resource_ops] [%s] added workload ops metric with property", ops.GetName(), ops.GetProperty())
 			}
 
 			service.SetExportable(false)
@@ -740,7 +915,7 @@ func (me *ZapiPerf) PollCounter() (*matrix.Matrix, error) {
 						m.SetLabel("resource", resource)
 						m.SetProperty(service.GetProperty())
 						// base counter is the ops of the same resource
-						m.SetComment(name + ".OPS")
+						m.SetComment("ops")
 
 						oldMetrics.Delete(name + ".LATENCY")
 						logger.Debug(me.Prefix, "+ [%s.LATENCY] (=> %s) added workload latency metric", name, resource)
@@ -805,6 +980,7 @@ func (me *ZapiPerf) PollCounter() (*matrix.Matrix, error) {
 	return nil, nil
 }
 
+// create a metric for a Zapi counter
 func (me *ZapiPerf) addCounter(counter *node.Node, name, display string, enabled bool, cache map[string]*node.Node) string {
 
 	var (
@@ -921,6 +1097,7 @@ func (me *ZapiPerf) addCounter(counter *node.Node, name, display string, enabled
 	return baseCounter
 }
 
+// override counter property
 func (me *ZapiPerf) GetOverride(counter string) string {
 	if o := me.Params.GetChildS("override"); o != nil {
 		return o.GetChildContentS(counter)
@@ -928,6 +1105,8 @@ func (me *ZapiPerf) GetOverride(counter string) string {
 	return ""
 }
 
+// parse ZAPI array counter (histogram), so we can store it
+// as multiple flat metrics
 func parseHistogramLabels(elem *node.Node) ([]string, string) {
 	var (
 		labels []string
@@ -953,6 +1132,7 @@ func parseHistogramLabels(elem *node.Node) ([]string, string) {
 	return labels, msg
 }
 
+// Update instance cache
 func (me *ZapiPerf) PollInstance() (*matrix.Matrix, error) {
 
 	var (
@@ -1049,13 +1229,23 @@ func (me *ZapiPerf) PollInstance() (*matrix.Matrix, error) {
 						if value := i.GetChildContentS(label); value != "" {
 							instance.SetLabel(display, value)
 							// @TODO cleanup redundant logging
-							logger.Debug(me.Prefix, "(%s) [%s] added QOS label (%s) => [%s]", me.Query, key, display, value)
+							//logger.Debug(me.Prefix, "(%s) [%s] added QOS label (%s) => [%s]", me.Query, key, display, value)
 						} else {
-							logger.Debug(me.Prefix, "(%s) [%s] skip QOS label (%s) - no value", me.Query, key, display)
+							//logger.Debug(me.Prefix, "(%s) [%s] skip QOS label (%s) - no value", me.Query, key, display)
 						}
 					}
 					logger.Debug(me.Prefix, "(%s) [%s] added QOS labels: %s", me.Query, key, instance.GetLabels().String())
 				}
+				/*
+					                    // @DEBUG
+					                if instance.GetLabel("volume") != "vol_georg_nfs1" || instance.GetLabel("vserver") != "svm_georg_nfs" {
+					                    me.Matrix.RemoveInstance(key)
+					                    logger.Debug(me.Prefix, "skipped instance [%s]", key)
+					                } else {
+									    logger.Debug(me.Prefix, "added new instance [%s%s%s%s]", color.Bold, color.Yellow, key, color.End)
+					                    logger.Debug(me.Prefix, "(%s) [%s] added QOS labels: %s", me.Query, key, instance.GetLabels().String())
+									}
+				*/
 			}
 		}
 	}

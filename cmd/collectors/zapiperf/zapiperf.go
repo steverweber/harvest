@@ -883,7 +883,7 @@ func (me *ZapiPerf) PollCounter() (*matrix.Matrix, error) {
 					return nil, err
 				}
 				ops.SetProperty(visits.GetProperty())
-				logger.Debug(me.Prefix, "+ [resource_ops] [%s] added workload ops metric with property", ops.GetName(), ops.GetProperty())
+				logger.Debug(me.Prefix, "+ [resource_ops] [%s] added workload ops metric with property (%s)", ops.GetName(), ops.GetProperty())
 			}
 
 			service.SetExportable(false)

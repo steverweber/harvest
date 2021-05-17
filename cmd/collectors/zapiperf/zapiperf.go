@@ -10,14 +10,13 @@
 	The exact formula of doing these calculations, depends on the property
 	of each counter and some counters require a "base-counter" additionally.
 
-	Counter properties and other metadata are fetched from the target
-	system during PollCounter, therefore this collector is ONTAP-version
-	independent.
+	Counter properties and other metadata are fetched from the target system
+	during PollCounter() making the collector ONTAP-version independent.
 
-	The collector also maintains a cache of instances, also updated
-	periodically with PollInstance.
+	The collector maintains a cache of instances, updated periodically as well,
+	during PollInstance().
 
-	The source code prioritizes performance over simlicity/readability.
+	The source code prioritizes performance over simplicity/readability.
 	Additionally, some objects (e.g. workloads) come with twists that
 	force the collector to do acrobatics. Don't expect to easily
 	comprehend what comes below.
@@ -74,7 +73,7 @@ func (me *ZapiPerf) Init() error {
 		return err
 	}
 	// Invoke generic initializer
-	// this will load Schedule, initialize Data and Metadata
+	// this will load Schedule, initialize data and metadata Matrices
 	if err := collector.Init(me); err != nil {
 		return err
 	}
@@ -148,9 +147,9 @@ func (me *ZapiPerf) loadParamInt(name string, defaultValue int) int {
 func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 
 	var (
-		instanceKeys                 []string
-		resourceLatency, resourceOps matrix.Metric // for workload* objects
-		err                          error
+		instanceKeys    []string
+		resourceLatency matrix.Metric // for workload* objects
+		err             error
 	)
 
 	logger.Debug(me.Prefix, "updating data cache")
@@ -287,13 +286,8 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 					continue
 				}
 
-				if resourceLatency = newData.GetMetric(layer + ".LATENCY"); resourceLatency == nil {
+				if resourceLatency = newData.GetMetric(layer); resourceLatency == nil {
 					logger.Warn(me.Prefix, "resource-latency metric [%s] missing in cache", layer)
-					continue
-				}
-
-				if resourceOps = newData.GetMetric(layer + ".OPS"); resourceOps == nil {
-					logger.Warn(me.Prefix, "resource-ops metric [%s] missing in cache", layer)
 					continue
 				}
 			}
@@ -383,13 +377,8 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 						}
 						continue
 					}
+					// "visits" are ignored
 					if name == "visits" {
-						if err := resourceOps.AddValueString(instance, value); err != nil {
-							logger.Error(me.Prefix, "add resource-ops (%s) value [%s]: %v", name, value, err)
-						} else {
-							logger.Trace(me.Prefix, "++ resource-ops (%s) = [%s%s%s]", name, color.Blue, value, color.End)
-							count++
-						}
 						continue
 					}
 				}
@@ -908,7 +897,7 @@ func (me *ZapiPerf) PollCounter() (*matrix.Matrix, error) {
 					name := x.GetNameS()
 					resource := x.GetContentS()
 
-					if m, err := me.Matrix.NewMetricFloat64(name + ".LATENCY"); err != nil {
+					if m, err := me.Matrix.NewMetricFloat64(name); err != nil {
 						return nil, err
 					} else {
 						m.SetName("resource_latency")
@@ -917,19 +906,8 @@ func (me *ZapiPerf) PollCounter() (*matrix.Matrix, error) {
 						// base counter is the ops of the same resource
 						m.SetComment("ops")
 
-						oldMetrics.Delete(name + ".LATENCY")
-						logger.Debug(me.Prefix, "+ [%s.LATENCY] (=> %s) added workload latency metric", name, resource)
-					}
-
-					if m, err := me.Matrix.NewMetricFloat64(name + ".OPS"); err != nil {
-						return nil, err
-					} else {
-						m.SetName("resource_ops")
-						m.SetLabel("resource", resource)
-						m.SetProperty(visits.GetProperty())
-
-						oldMetrics.Delete(name + ".OPS")
-						logger.Debug(me.Prefix, "+ [%s.OPS] (=> %s) added workload ops metric", name, resource)
+						oldMetrics.Delete(name)
+						logger.Debug(me.Prefix, "+ [%s] (=> %s) added workload latency metric", name, resource)
 					}
 				}
 			}
@@ -1236,16 +1214,6 @@ func (me *ZapiPerf) PollInstance() (*matrix.Matrix, error) {
 					}
 					logger.Debug(me.Prefix, "(%s) [%s] added QOS labels: %s", me.Query, key, instance.GetLabels().String())
 				}
-				/*
-					                    // @DEBUG
-					                if instance.GetLabel("volume") != "vol_georg_nfs1" || instance.GetLabel("vserver") != "svm_georg_nfs" {
-					                    me.Matrix.RemoveInstance(key)
-					                    logger.Debug(me.Prefix, "skipped instance [%s]", key)
-					                } else {
-									    logger.Debug(me.Prefix, "added new instance [%s%s%s%s]", color.Bold, color.Yellow, key, color.End)
-					                    logger.Debug(me.Prefix, "(%s) [%s] added QOS labels: %s", me.Query, key, instance.GetLabels().String())
-									}
-				*/
 			}
 		}
 	}

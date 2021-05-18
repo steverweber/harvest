@@ -25,7 +25,7 @@ func export(n *node.Node, c *client.Client, args *Args) error {
 	case "counters":
 		return exportCounters(n, c, args)
 	default:
-		return errors.New(INVALID_ITEM, args.Item)
+		return errors.New(InvalidItem, args.Item)
 	}
 }
 

@@ -27,11 +27,11 @@ func (me *Fcp) Run(data *matrix.Matrix) ([]*matrix.Matrix, error) {
 	var err error
 
 	if read = data.GetMetric("read_data"); read == nil {
-		return nil, errors.New(errors.ERR_NO_METRIC, "read_data")
+		return nil, errors.New(errors.NoMetricsError, "read_data")
 	}
 
 	if write = data.GetMetric("write_data"); write == nil {
-		return nil, errors.New(errors.ERR_NO_METRIC, "write_data")
+		return nil, errors.New(errors.NoMetricsError, "write_data")
 	}
 
 	if rx = data.GetMetric("read_percent"); rx == nil {

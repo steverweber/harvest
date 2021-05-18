@@ -141,7 +141,7 @@ func Init(c Collector) error {
 	// Initialize schedule and tasks (polls)
 	tasks := params.GetChildS("schedule")
 	if tasks == nil || len(tasks.GetChildren()) == 0 {
-		return errors.New(errors.MISSING_PARAM, "schedule")
+		return errors.New(errors.MissingParam, "schedule")
 	}
 
 	s := schedule.New()
@@ -155,13 +155,13 @@ func Init(c Collector) error {
 		if m := reflect.ValueOf(c).MethodByName(methodName); m.IsValid() {
 			if foo, ok := m.Interface().(func() (*matrix.Matrix, error)); ok {
 				if err := s.NewTaskString(task.GetNameS(), task.GetContentS(), foo); err != nil {
-					return errors.New(errors.INVALID_PARAM, "schedule ("+task.GetNameS()+"): "+err.Error())
+					return errors.New(errors.InvalidParam, "schedule ("+task.GetNameS()+"): "+err.Error())
 				}
 			} else {
-				return errors.New(errors.ERR_IMPLEMENT, methodName+" has not signature 'func() (*matrix.Matrix, error)'")
+				return errors.New(errors.ImplementationError, methodName+" has not signature 'func() (*matrix.Matrix, error)'")
 			}
 		} else {
-			return errors.New(errors.ERR_IMPLEMENT, methodName)
+			return errors.New(errors.ImplementationError, methodName)
 		}
 	}
 	c.SetSchedule(s)
@@ -275,7 +275,7 @@ func (me *AbstractCollector) Start(wg *sync.WaitGroup) {
 				switch {
 				// target system is unreachable
 				// enter standby mode and retry with some delay that will be increased if we fail again
-				case errors.IsErr(err, errors.ERR_CONNECTION):
+				case errors.IsErr(err, errors.ConnectionError):
 					if retryDelay < 1024 {
 						retryDelay *= 4
 					}
@@ -284,15 +284,15 @@ func (me *AbstractCollector) Start(wg *sync.WaitGroup) {
 						logger.Warn(me.Prefix, "target unreachable, entering standby mode (retry to connect in %d s)", retryDelay)
 					}
 					me.Schedule.SetStandByMode(task, time.Duration(retryDelay)*time.Second)
-					me.SetStatus(1, errors.ERR_CONNECTION)
+					me.SetStatus(1, errors.ConnectionError)
 				// there are no instances to collect
-				case errors.IsErr(err, errors.ERR_NO_INSTANCE):
+				case errors.IsErr(err, errors.NoInstancesError):
 					me.Schedule.SetStandByMode(task, 5*time.Minute)
-					me.SetStatus(1, errors.ERR_NO_INSTANCE)
+					me.SetStatus(1, errors.NoInstancesError)
 					logger.Info(me.Prefix, "no [%s] instances on system, entering standby mode", me.Object)
 				// no metrics available
-				case errors.IsErr(err, errors.ERR_NO_METRIC):
-					me.SetStatus(1, errors.ERR_NO_METRIC)
+				case errors.IsErr(err, errors.NoMetricsError):
+					me.SetStatus(1, errors.NoMetricsError)
 					me.Schedule.SetStandByMode(task, 1*time.Hour)
 					logger.Warn(me.Prefix, "no [%s] metrics on system, entering standby mode", me.Object)
 				// not an error we are expecting, so enter failed state and terminate
@@ -495,13 +495,13 @@ func (me *AbstractCollector) LoadPlugins(params *node.Node) error {
 			module, err := dload.LoadFuncFromModule(binpath, strings.ToLower(name), "New")
 			if err != nil {
 				//logger.Error(c.LongName, "load plugin [%s]: %v", name, err)
-				return errors.New(errors.ERR_DLOAD, "plugin "+name+": "+err.Error())
+				return errors.New(errors.DLoadError, "plugin "+name+": "+err.Error())
 			}
 
 			NewFunc, ok := module.(func(*plugin.AbstractPlugin) plugin.Plugin)
 			if !ok {
 				//logger.Error(c.LongName, "load plugin [%s]: New() has not expected signature", name)
-				return errors.New(errors.ERR_DLOAD, name+": New()")
+				return errors.New(errors.DLoadError, name+": New()")
 			}
 			p = NewFunc(abc)
 			logger.Debug(me.Prefix, "loaded dynamic plugin [%s]", name)

@@ -44,7 +44,7 @@ func (me *LabelAgent) Init() error {
 	}
 
 	if count = me.parseRules(); count == 0 {
-		err = errors.New(errors.MISSING_PARAM, "valid rules")
+		err = errors.New(errors.MissingParam, "valid rules")
 	} else {
 		logger.Debug(me.Prefix, "parsed %d rules for %d actions", count, len(me.actions))
 	}

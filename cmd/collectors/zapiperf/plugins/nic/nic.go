@@ -37,11 +37,11 @@ func (me *Nic) Run(data *matrix.Matrix) ([]*matrix.Matrix, error) {
 	var err error
 
 	if read = data.GetMetric("rx_bytes"); read == nil {
-		return nil, errors.New(errors.ERR_NO_METRIC, "rx_bytes")
+		return nil, errors.New(errors.NoMetricsError, "rx_bytes")
 	}
 
 	if write = data.GetMetric("tx_bytes"); write == nil {
-		return nil, errors.New(errors.ERR_NO_METRIC, "tx_bytes")
+		return nil, errors.New(errors.NoMetricsError, "tx_bytes")
 	}
 
 	if rx = data.GetMetric("rx_percent"); rx == nil {

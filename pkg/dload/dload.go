@@ -26,7 +26,7 @@ func LoadModule(binpath, name string) (*plugin.Plugin, error) {
 	}
 
 	if fn == "" {
-		return nil, errors.New(errors.ERR_DLOAD, name+".so not in "+binpath)
+		return nil, errors.New(errors.DLoadError, name+".so not in "+binpath)
 	}
 
 	return plugin.Open(path.Join(binpath, fn))

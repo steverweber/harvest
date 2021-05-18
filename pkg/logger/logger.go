@@ -118,7 +118,7 @@ func SetLevel(l int) error {
 	if l >= 0 && l < len(levels) {
 		level = l
 	} else {
-		err = errors.New(errors.INVALID_PARAM, "level "+strconv.Itoa(l))
+		err = errors.New(errors.InvalidParam, "level "+strconv.Itoa(l))
 	}
 	return err
 }

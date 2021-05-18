@@ -201,7 +201,7 @@ func (me *Poller) Init() error {
 			}
 			if _, err = os.Stat(fp); err != nil {
 				logger.Error(me.prefix, "%s %v", filenames[i], err)
-				return errors.New(errors.MISSING_PARAM, filenames[i]+": "+err.Error())
+				return errors.New(errors.MissingParam, filenames[i]+": "+err.Error())
 			}
 		}
 	}
@@ -220,7 +220,7 @@ func (me *Poller) Init() error {
 	// has requested them
 	if collectors := me.params.GetChildS("collectors"); collectors == nil {
 		logger.Warn(me.prefix, "no collectors defined for this poller in config")
-		return errors.New(errors.ERR_NO_COLLECTOR, "no collectors")
+		return errors.New(errors.NoCollectorsError, "no collectors")
 	} else {
 		for _, c := range collectors.GetAllChildContentS() {
 			ok := true
@@ -248,7 +248,7 @@ func (me *Poller) Init() error {
 	// at least one collector should successfully initialize
 	if len(me.collectors) == 0 {
 		logger.Warn(me.prefix, "no collectors initialized, stopping")
-		return errors.New(errors.ERR_NO_COLLECTOR, "no collectors")
+		return errors.New(errors.NoCollectorsError, "no collectors")
 	}
 
 	logger.Debug(me.prefix, "initialized %d collectors", len(me.collectors))
@@ -523,7 +523,7 @@ func (me *Poller) load_collector(class, object string) error {
 
 	NewFunc, ok := sym.(func(*collector.AbstractCollector) collector.Collector)
 	if !ok {
-		return errors.New(errors.ERR_DLOAD, "New() has not expected signature")
+		return errors.New(errors.DLoadError, "New() has not expected signature")
 	}
 
 	// load the template file(s) of the collector where we expect to find
@@ -531,7 +531,7 @@ func (me *Poller) load_collector(class, object string) error {
 	if template, err = collector.ImportTemplate(me.options.HomePath, "default.yaml", class); err != nil {
 		return err
 	} else if template == nil { // probably redundant
-		return errors.New(errors.MISSING_PARAM, "collector template")
+		return errors.New(errors.MissingParam, "collector template")
 	}
 
 	if custom, err = collector.ImportTemplate(me.options.HomePath, "custom.yaml", class); err == nil && custom != nil {
@@ -581,7 +581,7 @@ func (me *Poller) load_collector(class, object string) error {
 			col = NewFunc(collector.New(class, object.GetNameS(), me.options, template.Copy()))
 			if err = col.Init(); err != nil {
 				logger.Warn(me.prefix, "init collector-object (%s:%s): %v", class, object.GetNameS(), err)
-				if errors.IsErr(err, errors.ERR_CONNECTION) {
+				if errors.IsErr(err, errors.ConnectionError) {
 					logger.Warn(me.prefix, "aborting collector (%s)", class)
 					break
 				}
@@ -591,7 +591,7 @@ func (me *Poller) load_collector(class, object string) error {
 			}
 		}
 	} else {
-		return errors.New(errors.MISSING_PARAM, "collector object")
+		return errors.New(errors.MissingParam, "collector object")
 	}
 
 	me.collectors = append(me.collectors, collectors...)

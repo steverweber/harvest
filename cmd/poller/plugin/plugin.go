@@ -76,7 +76,7 @@ func (me *AbstractPlugin) Init() error {
 func (me *AbstractPlugin) InitAbc() error {
 
 	if me.Name = me.Params.GetNameS(); me.Name == "" {
-		return errors.New(errors.MISSING_PARAM, "plugin name")
+		return errors.New(errors.MissingParam, "plugin name")
 	}
 
 	me.Prefix = "(plugin) (" + me.Parent + ":" + me.Name + ")"

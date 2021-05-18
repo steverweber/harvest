@@ -108,7 +108,7 @@ func (me *Aggregator) parseRules() error {
 			logger.Debug(me.Prefix, "parsed rule [%v]", r)
 		} else {
 			logger.Warn(me.Prefix, "invalid rule syntax [%s]", line)
-			return errors.New(errors.INVALID_PARAM, "invalid rule")
+			return errors.New(errors.InvalidParam, "invalid rule")
 		}
 	}
 	return nil

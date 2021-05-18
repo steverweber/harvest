@@ -138,7 +138,7 @@ func (me *Unix) Init() error {
 	var err error
 
 	if !set.NewFrom(_SUPPORTED_PLATFORMS).Has(runtime.GOOS) {
-		return errors.New(errors.ERR_IMPLEMENT, "platform not supported")
+		return errors.New(errors.ImplementationError, "platform not supported")
 	}
 
 	if err = collector.Init(me); err != nil {
@@ -152,7 +152,7 @@ func (me *Unix) Init() error {
 
 	// assert fs is avilable
 	if fi, err := os.Stat(_MOUNT_POINT); err != nil || !fi.IsDir() {
-		return errors.New(errors.ERR_IMPLEMENT, "filesystem ["+_MOUNT_POINT+"] not available")
+		return errors.New(errors.ImplementationError, "filesystem ["+_MOUNT_POINT+"] not available")
 	}
 
 	// load list of counters from template
@@ -162,7 +162,7 @@ func (me *Unix) Init() error {
 			return err
 		}
 	} else {
-		return errors.New(errors.MISSING_PARAM, "counters")
+		return errors.New(errors.MissingParam, "counters")
 	}
 
 	getClockTicks()

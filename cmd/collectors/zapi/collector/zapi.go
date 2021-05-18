@@ -70,11 +70,11 @@ func (me *Zapi) InitVars() error {
 	var err error
 
 	if me.Client, err = client.New(me.Params); err != nil { // convert to connection error, so poller aborts
-		return errors.New(errors.ERR_CONNECTION, err.Error())
+		return errors.New(errors.ConnectionError, err.Error())
 	}
 
 	if err = me.Client.Init(5); err != nil { // 5 retries before giving up to connect
-		return errors.New(errors.ERR_CONNECTION, err.Error())
+		return errors.New(errors.ConnectionError, err.Error())
 	}
 	logger.Debug(me.Prefix, "connected to: %s", me.Client.Info())
 
@@ -94,12 +94,12 @@ func (me *Zapi) InitVars() error {
 
 	// object name from subtemplate
 	if me.object = me.Params.GetChildContentS("object"); me.object == "" {
-		return errors.New(errors.MISSING_PARAM, "object")
+		return errors.New(errors.MissingParam, "object")
 	}
 
 	// api query literal
 	if me.Query = me.Params.GetChildContentS("query"); me.Query == "" {
-		return errors.New(errors.MISSING_PARAM, "query")
+		return errors.New(errors.MissingParam, "query")
 	}
 	return nil
 }
@@ -125,7 +125,7 @@ func (me *Zapi) InitCache() error {
 
 	counters := me.Params.GetChildS("counters")
 	if counters == nil {
-		return errors.New(errors.MISSING_PARAM, "counters")
+		return errors.New(errors.MissingParam, "counters")
 	}
 
 	var ok bool
@@ -134,14 +134,14 @@ func (me *Zapi) InitCache() error {
 
 	if ok, me.desiredAttributes = me.LoadCounters(counters); !ok {
 		if me.Params.GetChildContentS("collect_only_labels") != "true" {
-			return errors.New(errors.ERR_NO_METRIC, "failed to parse any")
+			return errors.New(errors.NoMetricsError, "failed to parse any")
 		}
 	}
 
 	logger.Debug(me.Prefix, "initialized cache with %d metrics and %d labels", len(me.Matrix.GetInstances()), len(me.instanceLabelPaths))
 
 	if len(me.instanceKeyPaths) == 0 && me.Params.GetChildContentS("only_cluster_instance") != "true" {
-		return errors.New(errors.INVALID_PARAM, "no instance keys indicated")
+		return errors.New(errors.InvalidParam, "no instance keys indicated")
 	}
 
 	// @TODO validate
@@ -213,7 +213,7 @@ func (me *Zapi) PollInstance() (*matrix.Matrix, error) {
 
 			instances = response.SearchChildren(me.shortestPathPrefix)
 			if len(instances) == 0 {
-				return nil, errors.New(errors.ERR_NO_INSTANCE, "no instances in server response")
+				return nil, errors.New(errors.NoInstancesError, "no instances in server response")
 			}
 
 			logger.Debug(me.Prefix, "fetching %d instances", len(instances))
@@ -246,7 +246,7 @@ func (me *Zapi) PollInstance() (*matrix.Matrix, error) {
 	logger.Debug(me.Prefix, "added %d instances to cache (old cache had %d)", count, oldCount)
 
 	if len(me.Matrix.GetInstances()) == 0 {
-		return nil, errors.New(errors.ERR_NO_INSTANCE, "no instances fetched")
+		return nil, errors.New(errors.NoInstancesError, "no instances fetched")
 	}
 
 	return nil, nil
@@ -333,7 +333,7 @@ func (me *Zapi) PollData() (*matrix.Matrix, error) {
 		instances := response.SearchChildren(me.shortestPathPrefix)
 
 		if len(instances) == 0 {
-			return nil, errors.New(errors.ERR_NO_INSTANCE, "")
+			return nil, errors.New(errors.NoInstancesError, "")
 		}
 
 		logger.Debug(me.Prefix, "fetched %d instance elements", len(instances))

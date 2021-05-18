@@ -17,11 +17,6 @@ import (
 	"strings"
 )
 
-const (
-	ATTRIBUTE_NOT_FOUND = "attribute not found"
-	INVALID_ITEM        = "invalid item"
-)
-
 var (
 	maxSearchDepth  = 1
 	validShowArgs   = []string{"data", "apis", "attrs", "objects", "instances", "counters", "counter", "system"}
@@ -186,7 +181,7 @@ func get(c *client.Client, args *Args) (*node.Node, error) {
 	case "data":
 		return getData(c, args)
 	default:
-		return nil, errors.New(INVALID_ITEM, args.Item)
+		return nil, errors.New(InvalidItem, args.Item)
 	}
 }
 
@@ -205,7 +200,7 @@ func getApis(c *client.Client) (*node.Node, error) {
 	}
 
 	if n = n.GetChildS("apis"); n == nil {
-		return nil, errors.New(ATTRIBUTE_NOT_FOUND, "apis")
+		return nil, errors.New(MissingAttribute, "apis")
 	}
 	return n, nil
 }
@@ -221,7 +216,7 @@ func getObjects(c *client.Client) (*node.Node, error) {
 	}
 
 	if n = n.GetChildS("objects"); n == nil {
-		return nil, errors.New(ATTRIBUTE_NOT_FOUND, "objects")
+		return nil, errors.New(MissingAttribute, "objects")
 	}
 	return n, nil
 }
@@ -240,7 +235,7 @@ func getCounters(c *client.Client, args *Args) (*node.Node, error) {
 	}
 
 	if n = n.GetChildS("counters"); n == nil {
-		return nil, errors.New(ATTRIBUTE_NOT_FOUND, "counters")
+		return nil, errors.New(MissingAttribute, "counters")
 	}
 	return n, nil
 }
@@ -259,7 +254,7 @@ func getCounter(c *client.Client, args *Args) (*node.Node, error) {
 			return cnt, nil
 		}
 	}
-	return nil, errors.New(ATTRIBUTE_NOT_FOUND, args.Counter)
+	return nil, errors.New(MissingAttribute, args.Counter)
 }
 
 func getInstances(c *client.Client, args *Args) (*node.Node, error) {
@@ -280,7 +275,7 @@ func getInstances(c *client.Client, args *Args) (*node.Node, error) {
 	}
 
 	if n = n.GetChildS("attributes-list"); n == nil {
-		return nil, errors.New(ATTRIBUTE_NOT_FOUND, "attributes-list")
+		return nil, errors.New(MissingAttribute, "attributes-list")
 	}
 	return n, nil
 

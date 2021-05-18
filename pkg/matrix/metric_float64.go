@@ -222,7 +222,7 @@ func (me *MetricFloat64) Delta(s Metric) error {
 	s_values := s.GetValuesFloat64()
 	s_record := s.GetRecords()
 	if len(me.values) != len(s_values) {
-		return errors.New(UNEQUAL_VECTORS, fmt.Sprintf("minuend=%d, subtrahend=%d", len(me.values), len(s_values)))
+		return errors.New(UnequalVectors, fmt.Sprintf("minuend=%d, subtrahend=%d", len(me.values), len(s_values)))
 	}
 	for i := range me.values {
 		if me.record[i] && s_record[i] {
@@ -236,7 +236,7 @@ func (me *MetricFloat64) Divide(s Metric) error {
 	s_values := s.GetValuesFloat64()
 	s_record := s.GetRecords()
 	if len(me.values) != len(s_values) {
-		return errors.New(UNEQUAL_VECTORS, fmt.Sprintf("minuend=%d, subtrahend=%d", len(me.values), len(s_values)))
+		return errors.New(UnequalVectors, fmt.Sprintf("minuend=%d, subtrahend=%d", len(me.values), len(s_values)))
 	}
 	for i := 0; i < len(me.values); i++ {
 		if me.record[i] && s_record[i] && s_values[i] != 0 {
@@ -251,7 +251,7 @@ func (me *MetricFloat64) DivideWithThreshold(s Metric, t int) error {
 	s_values := s.GetValuesFloat64()
 	s_record := s.GetRecords()
 	if len(me.values) != len(s_values) {
-		return errors.New(UNEQUAL_VECTORS, fmt.Sprintf("minuend=%d, subtrahend=%d", len(me.values), len(s_values)))
+		return errors.New(UnequalVectors, fmt.Sprintf("minuend=%d, subtrahend=%d", len(me.values), len(s_values)))
 	}
 	for i := 0; i < len(me.values); i++ {
 		if me.record[i] && s_record[i] && s_values[i] >= x {

@@ -119,7 +119,7 @@ func (me *Prometheus) Init() error {
 		me.allowAddrs = x.GetAllChildContentS()
 		if len(me.allowAddrs) == 0 {
 			logger.Error(me.Prefix, "allow_addrs without any")
-			return errors.New(errors.INVALID_PARAM, "allow_addrs")
+			return errors.New(errors.InvalidParam, "allow_addrs")
 		}
 		me.checkAddrs = true
 		logger.Debug(me.Prefix, "added %d plain allow rules", len(me.allowAddrs))
@@ -134,12 +134,12 @@ func (me *Prometheus) Init() error {
 				me.allowAddrsRegex = append(me.allowAddrsRegex, reg)
 			} else {
 				logger.Error(me.Prefix, "parse regex: %v", err)
-				return errors.New(errors.INVALID_PARAM, "allow_addrs_regex")
+				return errors.New(errors.InvalidParam, "allow_addrs_regex")
 			}
 		}
 		if len(me.allowAddrsRegex) == 0 {
 			logger.Error(me.Prefix, "allow_addrs_regex without any")
-			return errors.New(errors.INVALID_PARAM, "allow_addrs")
+			return errors.New(errors.InvalidParam, "allow_addrs")
 		}
 		me.checkAddrs = true
 		logger.Debug(me.Prefix, "added %d regex allow rules", len(me.allowAddrsRegex))
@@ -159,9 +159,9 @@ func (me *Prometheus) Init() error {
 
 	// sanity check on port
 	if port == "" {
-		return errors.New(errors.MISSING_PARAM, "port")
+		return errors.New(errors.MissingParam, "port")
 	} else if _, err := strconv.Atoi(port); err != nil {
-		return errors.New(errors.INVALID_PARAM, "port ("+port+")")
+		return errors.New(errors.InvalidParam, "port ("+port+")")
 	}
 
 	addr := localHttpAddr

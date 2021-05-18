@@ -59,7 +59,7 @@ func (my *Shelf) Init() error {
 
 	objects := my.Params.GetChildS("objects")
 	if objects == nil {
-		return errors.New(errors.MISSING_PARAM, "objects")
+		return errors.New(errors.MissingParam, "objects")
 	}
 
 	for _, obj := range objects.GetChildren() {
@@ -146,7 +146,7 @@ func (my *Shelf) Run(data *matrix.Matrix) ([]*matrix.Matrix, error) {
 	}
 
 	if len(shelves) == 0 {
-		return nil, errors.New(errors.ERR_NO_INSTANCE, "no shelf instances found")
+		return nil, errors.New(errors.NoInstancesError, "no shelf instances found")
 	}
 
 	logger.Debug(my.Prefix, "fetching %d shelf counters", len(shelves))

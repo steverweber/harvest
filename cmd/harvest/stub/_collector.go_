@@ -50,7 +50,7 @@ func New(a *collector.AbstractCollector) collector.Collector {
    You can also add metric to the Matrix if they will never change. Examples:
 
    if me.Params.GetChildContentS("addr") == "" {
-	   return errors.New(errors.MISSING_PARAM, "addr")
+	   return errors.New(errors.MissingParam, "addr")
    }
 
    if err := c.Matrix.NewMetricInt64("some_methirc"); err != nil {

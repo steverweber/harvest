@@ -38,7 +38,7 @@ type Process struct {
 }
 
 // NewProcess - returns an initialzed instance of Process
-// if no process with *pid* exists, returns PROCESS_NOT_FOUND
+// if no process with *pid* exists, returns ProcessNotFound
 func NewProcess(pid int) (*Process, error) {
 	me := &Process{pid: pid}
 	me.cpu = make(map[string]float64)
@@ -73,9 +73,9 @@ func (me *Process) Reload() error {
 
 	if s, err := os.Stat(me.dirpath); err != nil || !s.IsDir() {
 		if err == nil {
-			return errors.New(PROCESS_NOT_FOUND, fmt.Sprintf("%s is not dir", me.dirpath))
+			return errors.New(ProcessNotFound, fmt.Sprintf("%s is not dir", me.dirpath))
 		} else {
-			return errors.New(PROCESS_NOT_FOUND, err.Error())
+			return errors.New(ProcessNotFound, err.Error())
 		}
 	}
 
@@ -123,7 +123,7 @@ func (me *Process) loadCmdline() error {
 		err  error
 	)
 	if data, err = ioutil.ReadFile(path.Join(me.dirpath, "cmdline")); err != nil {
-		return errors.New(FILE_READ, err.Error())
+		return errors.New(ReadFileError, err.Error())
 	}
 	me.cmdline = string(bytes.ReplaceAll(data, []byte("\x00"), []byte(" ")))
 	return nil
@@ -139,7 +139,7 @@ func (me *Process) loadStatus() error {
 	)
 
 	if data, err = ioutil.ReadFile(path.Join(me.dirpath, "status")); err != nil {
-		return errors.New(FILE_READ, "status: "+err.Error())
+		return errors.New(ReadFileError, "status: "+err.Error())
 	}
 
 	for _, line = range strings.Split(string(data), "\n") {
@@ -182,7 +182,7 @@ func (me *Process) loadStat() error {
 	)
 
 	if data, err = ioutil.ReadFile(path.Join(me.dirpath, "stat")); err != nil {
-		return errors.New(FILE_READ, "stat: "+err.Error())
+		return errors.New(ReadFileError, "stat: "+err.Error())
 	}
 
 	// store previous values to calculate deltas
@@ -229,7 +229,7 @@ func (me *Process) loadSmaps() error {
 	)
 
 	if data, err = ioutil.ReadFile(path.Join(me.dirpath, "smaps")); err != nil {
-		return errors.New(FILE_READ, "smaps: "+err.Error())
+		return errors.New(ReadFileError, "smaps: "+err.Error())
 	}
 
 	me.mem = make(map[string]uint64)
@@ -264,7 +264,7 @@ func (me *Process) loadIo() error {
 	)
 
 	if data, err = ioutil.ReadFile(path.Join(me.dirpath, "io")); err != nil {
-		return errors.New(FILE_READ, "io: "+err.Error())
+		return errors.New(ReadFileError, "io: "+err.Error())
 	}
 
 	for _, line = range strings.Split(string(data), "\n") {
@@ -289,7 +289,7 @@ func (me *Process) loadNetDev() error {
 	)
 
 	if data, err = ioutil.ReadFile(path.Join(me.dirpath, "net", "dev")); err != nil {
-		return errors.New(FILE_READ, "net/dev: "+err.Error())
+		return errors.New(ReadFileError, "net/dev: "+err.Error())
 	}
 
 	me.net = make(map[string]uint64)
@@ -329,7 +329,7 @@ func (me *Process) loadNetDev() error {
 func (me *Process) loadFdinfo() error {
 	files, err := ioutil.ReadDir(path.Join(me.dirpath, "fdinfo"))
 	if err != nil {
-		return errors.New(DIR_READ, "fdinfo: "+err.Error())
+		return errors.New(ReadDirError, "fdinfo: "+err.Error())
 	}
 	me.numFds = uint64(len(files))
 	return nil

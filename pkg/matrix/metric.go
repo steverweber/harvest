@@ -190,21 +190,21 @@ func (me *AbstractMetric) SetValueNAN(i *Instance) {
 }
 
 func (me *AbstractMetric) Delta(s Metric) error {
-	return errors.New(errors.ERR_IMPLEMENT, me.dtype)
+	return errors.New(errors.ImplementationError, me.dtype)
 }
 
 func (me *AbstractMetric) Divide(s Metric) error {
-	return errors.New(errors.ERR_IMPLEMENT, me.dtype)
+	return errors.New(errors.ImplementationError, me.dtype)
 }
 
 func (me *AbstractMetric) DivideWithThreshold(s Metric, t int) error {
-	return errors.New(errors.ERR_IMPLEMENT, me.dtype)
+	return errors.New(errors.ImplementationError, me.dtype)
 }
 
 func (me *AbstractMetric) MultiplyByScalar(s int) error {
-	return errors.New(errors.ERR_IMPLEMENT, me.dtype)
+	return errors.New(errors.ImplementationError, me.dtype)
 }
 
 func (me *AbstractMetric) AddValueString(i *Instance, s string) error {
-	return errors.New(errors.ERR_IMPLEMENT, me.dtype)
+	return errors.New(errors.ImplementationError, me.dtype)
 }

@@ -161,7 +161,7 @@ func (me *Matrix) NewMetricType(key, dtype string) (Metric, error) {
 	case "float64":
 		return me.NewMetricFloat64(key)
 	default:
-		return nil, errors.New(INVALID_DTYPE, dtype)
+		return nil, errors.New(InvalidDataType, dtype)
 	}
 }
 
@@ -172,7 +172,7 @@ func (me *Matrix) ChangeMetricType(key, dtype string) (Metric, error) {
 
 func (me *Matrix) addMetric(key string, metric Metric) error {
 	if _, has := me.metrics[key]; has {
-		return errors.New(DUPLICATE_METRIC_KEY, key)
+		return errors.New(DuplicateMetricKey, key)
 	}
 	metric.Reset(len(me.instances))
 	me.metrics[key] = metric
@@ -211,7 +211,7 @@ func (me *Matrix) NewInstance(key string) (*Instance, error) {
 	var instance *Instance
 
 	if _, has := me.instances[key]; has {
-		return nil, errors.New(DUPLICATE_INSTANCE_KEY, key)
+		return nil, errors.New(DuplicateInstanceKey, key)
 	}
 
 	instance = NewInstance(len(me.instances)) // index is current count of instances

@@ -56,28 +56,28 @@ func (e *InfluxDB) Init() error {
 
 	// check required / optional parameters
 	if addr = e.Params.GetChildContentS("addr"); addr == "" {
-		return errors.New(errors.MISSING_PARAM, "addr")
+		return errors.New(errors.MissingParam, "addr")
 	}
 
 	if port = e.Params.GetChildContentS("port"); port == "" {
 		logger.Debug(e.Prefix, "using default port [%s]", defaultPort)
 		port = defaultPort
 	} else if _, err = strconv.Atoi(port); err != nil {
-		return errors.New(errors.INVALID_PARAM, "port")
+		return errors.New(errors.InvalidParam, "port")
 	}
 
 	if bucket = e.Params.GetChildContentS("bucket"); bucket == "" {
-		return errors.New(errors.MISSING_PARAM, "bucket")
+		return errors.New(errors.MissingParam, "bucket")
 	}
 	logger.Debug(e.Prefix, "using bucket [%s]", bucket)
 
 	if org = e.Params.GetChildContentS("org"); org == "" {
-		return errors.New(errors.MISSING_PARAM, "org")
+		return errors.New(errors.MissingParam, "org")
 	}
 	logger.Debug(e.Prefix, "using organization [%s]", org)
 
 	if e.token = e.Params.GetChildContentS("token"); e.token == "" {
-		return errors.New(errors.MISSING_PARAM, "token")
+		return errors.New(errors.MissingParam, "token")
 	} else {
 		logger.Debug(e.Prefix, "will use authorization with api token")
 	}
@@ -189,9 +189,9 @@ func (e *InfluxDB) Emit(data [][]byte) error {
 	if response.StatusCode != expectedResponseCode {
 		defer response.Body.Close()
 		if body, err := ioutil.ReadAll(response.Body); err != nil {
-			return errors.New(errors.API_RESPONSE, err.Error())
+			return errors.New(errors.ApiResponse, err.Error())
 		} else {
-			return errors.New(errors.API_REQ_REJECTED, string(body))
+			return errors.New(errors.ApiResponseError, string(body))
 		}
 	}
 	return nil

@@ -61,7 +61,7 @@ func New(config *node.Node) (*Client, error) {
 	}
 
 	if addr = config.GetChildContentS("addr"); addr == "" {
-		return nil, errors.New(errors.MISSING_PARAM, "addr")
+		return nil, errors.New(errors.MissingParam, "addr")
 	}
 
 	url = "https://" + addr + ":443/servlets/netapp.servlets.admin.XMLrequest_filer"
@@ -90,9 +90,9 @@ func New(config *node.Node) (*Client, error) {
 		keyPath := config.GetChildContentS("ssl_key")
 
 		if certPath == "" {
-			return nil, errors.New(errors.MISSING_PARAM, "ssl_cert")
+			return nil, errors.New(errors.MissingParam, "ssl_cert")
 		} else if keyPath == "" {
-			return nil, errors.New(errors.MISSING_PARAM, "ssl_key")
+			return nil, errors.New(errors.MissingParam, "ssl_key")
 		} else if cert, err = tls.LoadX509KeyPair(certPath, keyPath); err != nil {
 			return nil, err
 		}
@@ -105,16 +105,16 @@ func New(config *node.Node) (*Client, error) {
 	} else {
 
 		if !useInsecureTLS {
-			return nil, errors.New(errors.INVALID_PARAM, "use_insecure_tls is false, but no certificates")
+			return nil, errors.New(errors.InvalidParam, "use_insecure_tls is false, but no certificates")
 		}
 
 		username := config.GetChildContentS("username")
 		password := config.GetChildContentS("password")
 
 		if username == "" {
-			return nil, errors.New(errors.MISSING_PARAM, "username")
+			return nil, errors.New(errors.MissingParam, "username")
 		} else if password == "" {
-			return nil, errors.New(errors.MISSING_PARAM, "password")
+			return nil, errors.New(errors.MissingParam, "password")
 		}
 
 		request.SetBasicAuth(username, password)
@@ -328,11 +328,11 @@ func (c *Client) InvokeRaw() ([]byte, error) {
 	)
 
 	if response, err = c.client.Do(c.request); err != nil {
-		return body, errors.New(errors.ERR_CONNECTION, err.Error())
+		return body, errors.New(errors.ConnectionError, err.Error())
 	}
 
 	if response.StatusCode != 200 {
-		return body, errors.New(errors.API_RESPONSE, response.Status)
+		return body, errors.New(errors.ApiResponse, response.Status)
 	}
 
 	return ioutil.ReadAll(response.Body)
@@ -360,14 +360,14 @@ func (c *Client) invoke(withTimers bool) (*node.Node, time.Duration, time.Durati
 		start = time.Now()
 	}
 	if response, err = c.client.Do(c.request); err != nil {
-		return result, responseT, parseT, errors.New(errors.ERR_CONNECTION, err.Error())
+		return result, responseT, parseT, errors.New(errors.ConnectionError, err.Error())
 	}
 	if withTimers {
 		responseT = time.Since(start)
 	}
 
 	if response.StatusCode != 200 {
-		return result, responseT, parseT, errors.New(errors.API_RESPONSE, response.Status)
+		return result, responseT, parseT, errors.New(errors.ApiResponse, response.Status)
 	}
 
 	// read response body
@@ -390,18 +390,18 @@ func (c *Client) invoke(withTimers bool) (*node.Node, time.Duration, time.Durati
 
 	// check if request was successful
 	if result = root.GetChildS("results"); result == nil {
-		return result, responseT, parseT, errors.New(errors.API_RESPONSE, "missing \"results\"")
+		return result, responseT, parseT, errors.New(errors.ApiResponse, "missing \"results\"")
 	}
 
 	if status, found = result.GetAttrValueS("status"); !found {
-		return result, responseT, parseT, errors.New(errors.API_RESPONSE, "missing status attribute")
+		return result, responseT, parseT, errors.New(errors.ApiResponse, "missing status attribute")
 	}
 
 	if status != "passed" {
 		if reason, found = result.GetAttrValueS("reason"); !found {
-			err = errors.New(errors.API_REQ_REJECTED, "no reason")
+			err = errors.New(errors.ApiResponseError, "no reason")
 		} else {
-			err = errors.New(errors.API_REQ_REJECTED, reason)
+			err = errors.New(errors.ApiResponseError, reason)
 		}
 		return result, responseT, parseT, err
 	}

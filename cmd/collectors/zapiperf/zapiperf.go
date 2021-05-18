@@ -165,7 +165,7 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 
 	timestamp := newData.GetMetric("timestamp")
 	if timestamp == nil {
-		return nil, errors.New(errors.MISSING_PARAM, "timestamp metric") // @TODO errconfig??
+		return nil, errors.New(errors.MissingParam, "timestamp metric") // @TODO errconfig??
 	}
 
 	// for updating metadata
@@ -184,7 +184,7 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 	// we will request counter data
 	if me.Query == objWorkloadDetail || me.Query == objWorkloadDetailVolume {
 		if resourceMap := me.Params.GetChildS("resource_map"); resourceMap == nil {
-			return nil, errors.New(errors.MISSING_PARAM, "resource_map")
+			return nil, errors.New(errors.MissingParam, "resource_map")
 		} else {
 			instanceKeys = make([]string, 0)
 			for _, layer := range resourceMap.GetAllChildNamesS() {
@@ -265,7 +265,7 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 		// fetch instances
 		instances := response.GetChildS("instances")
 		if instances == nil || len(instances.GetChildren()) == 0 {
-			err = errors.New(errors.ERR_NO_INSTANCE, "")
+			err = errors.New(errors.NoInstancesError, "")
 			break
 		}
 
@@ -594,7 +594,7 @@ func (me *ZapiPerf) GetParentOpsCounters(data *matrix.Matrix, KeyAttr string) (t
 
 	if ops = data.GetMetric("ops"); ops == nil {
 		logger.Error(me.Prefix, "ops counter not found in cache")
-		return apiT, parseT, errors.New(errors.MISSING_PARAM, "counter ops")
+		return apiT, parseT, errors.New(errors.MissingParam, "counter ops")
 	}
 
 	instanceKeys = data.GetInstanceKeys()
@@ -739,7 +739,7 @@ func (me *ZapiPerf) PollCounter() (*matrix.Matrix, error) {
 			}
 		}
 	} else {
-		return nil, errors.New(errors.MISSING_PARAM, "counters")
+		return nil, errors.New(errors.MissingParam, "counters")
 	}
 
 	logger.Debug(me.Prefix, "updating metric cache (old cache has %d metrics and %d labels", oldMetrics.Size(), oldLabels.Size())
@@ -764,7 +764,7 @@ func (me *ZapiPerf) PollCounter() (*matrix.Matrix, error) {
 			}
 		}
 	} else {
-		return nil, errors.New(errors.ERR_NO_METRIC, "no counters in response")
+		return nil, errors.New(errors.NoMetricsError, "no counters in response")
 	}
 
 	for key, counter := range counters {
@@ -880,7 +880,7 @@ func (me *ZapiPerf) PollCounter() (*matrix.Matrix, error) {
 			}
 
 			if service == nil || wait == nil || visits == nil {
-				return nil, errors.New(errors.MISSING_PARAM, "workload metrics")
+				return nil, errors.New(errors.MissingParam, "workload metrics")
 			}
 
 			if ops = me.Matrix.GetMetric("ops"); ops == nil {
@@ -896,7 +896,7 @@ func (me *ZapiPerf) PollCounter() (*matrix.Matrix, error) {
 			visits.SetExportable(false)
 
 			if resourceMap := me.Params.GetChildS("resource_map"); resourceMap == nil {
-				return nil, errors.New(errors.MISSING_PARAM, "resource_map")
+				return nil, errors.New(errors.MissingParam, "resource_map")
 			} else {
 				for _, x := range resourceMap.GetChildren() {
 					name := x.GetNameS()
@@ -919,7 +919,7 @@ func (me *ZapiPerf) PollCounter() (*matrix.Matrix, error) {
 		}
 
 		if qosLabels := me.Params.GetChildS("qos_labels"); qosLabels == nil {
-			return nil, errors.New(errors.MISSING_PARAM, "qos_labels")
+			return nil, errors.New(errors.MissingParam, "qos_labels")
 		} else {
 			me.qosLabels = make(map[string]string)
 			for _, label := range qosLabels.GetAllChildContentS() {
@@ -957,7 +957,7 @@ func (me *ZapiPerf) PollCounter() (*matrix.Matrix, error) {
 	logger.Debug(me.Prefix, "added %d new, removed %d labels (total: %d)", labelsAdded, oldLabels.Size(), len(me.instanceLabels))
 
 	if len(me.Matrix.GetMetrics()) == 0 {
-		return nil, errors.New(errors.ERR_NO_METRIC, "")
+		return nil, errors.New(errors.NoMetricsError, "")
 	}
 
 	return nil, nil
@@ -1235,7 +1235,7 @@ func (me *ZapiPerf) PollInstance() (*matrix.Matrix, error) {
 	logger.Debug(me.Prefix, "added %d new, removed %d (total instances %d)", added, removed, newSize)
 
 	if newSize == 0 {
-		return nil, errors.New(errors.ERR_NO_INSTANCE, "")
+		return nil, errors.New(errors.NoInstancesError, "")
 	}
 
 	return nil, err

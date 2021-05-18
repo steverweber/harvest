@@ -30,7 +30,7 @@ func GetExporters(config_fp string) (*node.Node, error) {
 	}
 
 	if exporters = config.GetChildS("Exporters"); exporters == nil {
-		err = errors.New(errors.ERR_CONFIG, "[Exporters] section not found")
+		err = errors.New(errors.ConfigError, "[Exporters] section not found")
 		return nil, err
 	}
 
@@ -48,7 +48,7 @@ func GetPollerNames(config_fp string) ([]string, error) {
 	}
 
 	if pollers = config.GetChildS("Pollers"); pollers == nil {
-		return poller_names, errors.New(errors.ERR_CONFIG, "[Pollers] section not found")
+		return poller_names, errors.New(errors.ConfigError, "[Pollers] section not found")
 	}
 
 	poller_names = make([]string, 0)
@@ -72,7 +72,7 @@ func GetPollers(config_fp string) (*node.Node, error) {
 	defaults = config.GetChildS("Defaults")
 
 	if pollers == nil {
-		err = errors.New(errors.ERR_CONFIG, "[Pollers] section not found")
+		err = errors.New(errors.ConfigError, "[Pollers] section not found")
 	} else if defaults != nil { // optional
 		for _, p := range pollers.GetChildren() {
 			p.Union(defaults)
@@ -87,7 +87,7 @@ func GetPoller(config_fp, poller_name string) (*node.Node, error) {
 
 	if pollers, err = GetPollers(config_fp); err == nil {
 		if poller = pollers.GetChildS(poller_name); poller == nil {
-			err = errors.New(errors.ERR_CONFIG, "poller ["+poller_name+"] not found")
+			err = errors.New(errors.ConfigError, "poller ["+poller_name+"] not found")
 		}
 	}
 

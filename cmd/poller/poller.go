@@ -54,10 +54,10 @@ import (
 
 // default params
 var (
-	_POLLER_SCHEDULE string = "60s"
-	_LOG_FILE_NAME   string = ""
-	_LOG_MAX_BYTES   int64  = 10000000 // 10MB
-	_LOG_MAX_FILES   int    = 10
+	DefaultPollerSchedule string = "60s"
+	DefaultLogFileName    string = ""
+	DefaultLogMaxBytes    int64  = 10000000 // 10MB
+	DefaultLogMaxFiles    int    = 10
 )
 
 // signals to catch
@@ -113,8 +113,8 @@ func (me *Poller) Init() error {
 
 	// if we are daemon, use file logging
 	if me.options.Daemon {
-		_LOG_FILE_NAME = "poller_" + me.name + ".log"
-		if err = logger.OpenFileOutput(me.options.LogPath, _LOG_FILE_NAME); err != nil {
+		DefaultLogFileName = "poller_" + me.name + ".log"
+		if err = logger.OpenFileOutput(me.options.LogPath, DefaultLogFileName); err != nil {
 			return err
 		}
 	}
@@ -167,14 +167,14 @@ func (me *Poller) Init() error {
 	// size of file before rotating
 	if s := me.params.GetChildContentS("log_max_bytes"); s != "" {
 		if i, err := strconv.ParseInt(s, 10, 64); err == nil {
-			_LOG_MAX_BYTES = i
+			DefaultLogMaxBytes = i
 		}
 	}
 
 	// maximum number of rotated files to keep
 	if s := me.params.GetChildContentS("log_max_files"); s != "" {
 		if i, err := strconv.Atoi(s); err == nil {
-			_LOG_MAX_FILES = i
+			DefaultLogMaxFiles = i
 		}
 	}
 
@@ -265,14 +265,14 @@ func (me *Poller) Init() error {
 	// we will check the status of collectors, exporters and target system,
 	// and send metadata to exporters
 	if s := me.params.GetChildContentS("poller_schedule"); s != "" {
-		_POLLER_SCHEDULE = s
+		DefaultPollerSchedule = s
 	}
 	me.schedule = schedule.New()
-	if err = me.schedule.NewTaskString("poller", _POLLER_SCHEDULE, nil); err != nil {
+	if err = me.schedule.NewTaskString("poller", DefaultPollerSchedule, nil); err != nil {
 		logger.Error(me.prefix, "set schedule: %v", err)
 		return err
 	}
-	logger.Debug(me.prefix, "set poller schedule with %s frequency", _POLLER_SCHEDULE)
+	logger.Debug(me.prefix, "set poller schedule with %s frequency", DefaultPollerSchedule)
 
 	// famous last words
 	logger.Info(me.prefix, "poller start-up complete")
@@ -409,12 +409,12 @@ func (me *Poller) Run() {
 			// @TODO: probably delegate to log handler (both rotating and panicing)
 			if me.options.Daemon {
 				// check size of log file
-				if stat, err := os.Stat(path.Join(me.options.LogPath, _LOG_FILE_NAME)); err != nil {
+				if stat, err := os.Stat(path.Join(me.options.LogPath, DefaultLogFileName)); err != nil {
 					logger.Error(me.prefix, "stat: %v", err)
 					// rotate if exceeds threshold
-				} else if stat.Size() >= _LOG_MAX_BYTES {
+				} else if stat.Size() >= DefaultLogMaxBytes {
 					logger.Debug(me.prefix, "rotating log (size= %d bytes)", stat.Size())
-					if err = logger.Rotate(me.options.LogPath, _LOG_FILE_NAME, _LOG_MAX_FILES); err != nil {
+					if err = logger.Rotate(me.options.LogPath, DefaultLogFileName, DefaultLogMaxFiles); err != nil {
 						logger.Error(me.prefix, "rotating log: %v", err)
 					}
 				}

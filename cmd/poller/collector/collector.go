@@ -16,7 +16,7 @@
 package collector
 
 import (
-	"goharvest2/pkg/config"
+	"goharvest2/pkg/conf"
 	"path"
 	"reflect"
 	"strconv"
@@ -134,7 +134,7 @@ func New(name, object string, options *options.Options, params *node.Node) *Abst
 func Init(c Collector) error {
 
 	params := c.GetParams()
-	options := c.GetOptions()
+	opts := c.GetOptions()
 	name := c.GetName()
 	object := c.GetObject()
 
@@ -200,9 +200,9 @@ func Init(c Collector) error {
 	// Initialize metadata
 	md := matrix.New(name, "metadata_collector")
 
-	md.SetGlobalLabel("hostname", options.Hostname)
-	md.SetGlobalLabel("version", options.Version)
-	md.SetGlobalLabel("poller", options.Poller)
+	md.SetGlobalLabel("hostname", opts.Hostname)
+	md.SetGlobalLabel("version", opts.Version)
+	md.SetGlobalLabel("poller", opts.Poller)
 	md.SetGlobalLabel("collector", name)
 	md.SetGlobalLabel("object", object)
 
@@ -456,7 +456,7 @@ func (me *AbstractCollector) SetMetadata(m *matrix.Matrix) {
 // WantedExporters retrievs the names of the exporters to which the collector
 // needs to export data
 func (me *AbstractCollector) WantedExporters(configFp string) []string {
-	names, err := config.GetUniqueExporters(me.Params, configFp)
+	names, err := conf.GetUniqueExporters(me.Params, configFp)
 	if err != nil {
 		logger.Error(me.Prefix, "Error while fetching exporters %v", err)
 	}

@@ -222,25 +222,39 @@ func (me *Poller) Init() error {
 		logger.Warn(me.prefix, "no collectors defined for this poller in config")
 		return errors.New(errors.NoCollectorsError, "no collectors")
 	} else {
-		for _, c := range collectors.GetAllChildContentS() {
+
+		for _, c := range collectors.GetChildren() {
+
+			// use default policy for loading templates
+			templates := []string{"default.yaml", "custom.yaml"}
+			name := c.GetContentS()
+
+			// or use user-defined templates
+			if len(c.GetChildren()) != 0 {
+				name = c.GetNameS()
+				templates = c.GetAllChildContentS()
+			}
+
 			ok := true
 			// if requested, filter collectors
 			if len(me.options.Collectors) != 0 {
 				ok = false
 				for _, x := range me.options.Collectors {
-					if x == c {
+					if x == name {
 						ok = true
 						break
 					}
 				}
 			}
 			if !ok {
-				logger.Debug(me.prefix, "skipping collector [%s]", c)
+				logger.Debug(me.prefix, "skipping collector [%s]", name)
 				continue
 			}
 
-			if err = me.load_collector(c, ""); err != nil {
-				logger.Error(me.prefix, "load collector (%s): %v", c, err)
+			logger.Warn(me.prefix, "loading collector (%s) with template(s): %v", name, templates)
+
+			if err = me.load_collector(name, "", templates); err != nil {
+				logger.Error(me.prefix, "load collector (%s): %v", name, err)
 			}
 		}
 	}
@@ -494,7 +508,7 @@ func (me *Poller) ping() (float32, bool) {
 // dynamically load and initialize a collector
 // if there are more than one objects defined for a collector,
 // then multiple collectors will be initialized
-func (me *Poller) load_collector(class, object string) error {
+func (me *Poller) load_collector(class, object string, templates []string) error {
 
 	var (
 		err              error
@@ -528,15 +542,25 @@ func (me *Poller) load_collector(class, object string) error {
 
 	// load the template file(s) of the collector where we expect to find
 	// object name or list of objects
-	if template, err = collector.ImportTemplate(me.options.HomePath, "default.yaml", class); err != nil {
+	if len(templates) == 0 {
+		return errors.New(errors.MissingParam, "collector template names")
+	}
+
+	// load main template
+	if template, err = collector.ImportTemplate(me.options.HomePath, templates[0], class); err != nil {
 		return err
 	} else if template == nil { // probably redundant
 		return errors.New(errors.MissingParam, "collector template")
 	}
+	logger.Debug(me.prefix, "imported main template [%s]", templates[0])
 
-	if custom, err = collector.ImportTemplate(me.options.HomePath, "custom.yaml", class); err == nil && custom != nil {
-		template.Merge(custom)
-		logger.Debug(me.prefix, "merged custom and default templates")
+	// load secondary templates (if any) and merge into main
+	for _, fn := range templates[1:] {
+
+		if custom, err = collector.ImportTemplate(me.options.HomePath, fn, class); err == nil && custom != nil {
+			template.Merge(custom)
+			logger.Debug(me.prefix, "merged custom template [%s]", fn)
+		}
 	}
 
 	// add Poller's parameters to the collector parameters

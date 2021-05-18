@@ -45,6 +45,11 @@ const (
 	instanceKey   = "uuid"
 	batchSize     = 500
 	latencyIoReqd = 10
+	// objects that need special handling
+	objWorkload = "workload"
+	objWorkloadDetail = "workload_detail"
+	objWorkloadVolume = "workload_volume"
+	objWorkloadDetailVolume = "workload_detail_volume"
 )
 
 const BILLION = 1000000000
@@ -177,7 +182,7 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 
 	// list of instance keys (instance names or uuids) for which
 	// we will request counter data
-	if me.Query == "workload_detail" || me.Query == "workload_detail_volume" {
+	if me.Query == objWorkloadDetail || me.Query == objWorkloadDetailVolume {
 		if resourceMap := me.Params.GetChildS("resource_map"); resourceMap == nil {
 			return nil, errors.New(errors.MISSING_PARAM, "resource_map")
 		} else {
@@ -276,7 +281,7 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 			key := i.GetChildContentS(me.instanceKey)
 			layer := ""
 
-			if me.Query == "workload_detail" || me.Query == "workload_detail_volume" {
+			if me.Query == objWorkloadDetail || me.Query == objWorkloadDetailVolume {
 
 				if x := strings.Split(key, "."); len(x) == 2 {
 					key = x[0]
@@ -367,7 +372,7 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 				}
 
 				// special case for workload_detail
-				if me.Query == "workload_detail" || me.Query == "workload_detail_volume" {
+				if me.Query == objWorkloadDetail || me.Query == objWorkloadDetailVolume {
 					if name == "wait_time" || name == "service_time" {
 						if err := resourceLatency.AddValueString(instance, value); err != nil {
 							logger.Error(me.Prefix, "add resource-latency (%s) value [%s]: %v", name, value, err)
@@ -404,7 +409,7 @@ func (me *ZapiPerf) PollData() (*matrix.Matrix, error) {
 
 	logger.Debug(me.Prefix, "collected %d data points in %d batch polls", count, batchCount)
 
-	if me.Query == "workload_detail" || me.Query == "workload_detail_volume" {
+	if me.Query == objWorkloadDetail || me.Query == objWorkloadDetailVolume {
 		if rd, pd, err := me.GetParentOpsCounters(newData, keyName); err == nil {
 			apiT += rd
 			parseT += pd
@@ -576,10 +581,10 @@ func (me *ZapiPerf) GetParentOpsCounters(data *matrix.Matrix, KeyAttr string) (t
 		err          error
 	)
 
-	if me.Query == "workload_detail" {
-		object = "workload"
+	if me.Query == objWorkloadDetail {
+		object = objWorkload
 	} else {
-		object = "workload_volume"
+		object = objWorkloadVolume
 	}
 
 	logger.Debug(me.Prefix, "(%s) starting redundancy poll for ops from parent object (%s)", me.Query, object)
@@ -850,11 +855,11 @@ func (me *ZapiPerf) PollCounter() (*matrix.Matrix, error) {
 	}
 
 	// hack for workload objects, @TODO replace with a plugin
-	if me.Query == "workload" || me.Query == "workload_detail" || me.Query == "workload_volume" || me.Query == "workload_detail_volume" {
+	if me.Query == objWorkload || me.Query == objWorkloadDetail || me.Query == objWorkloadVolume || me.Query == objWorkloadDetailVolume {
 
 		// for these two objects, we need to create latency/ops counters for each of the workload layers
 		// there original counters will be discarded
-		if me.Query == "workload_detail" || me.Query == "workload_detail_volume" {
+		if me.Query == objWorkloadDetail || me.Query == objWorkloadDetailVolume {
 
 			var service, wait, visits, ops matrix.Metric
 			oldMetrics.Delete("service_time")
@@ -1134,11 +1139,11 @@ func (me *ZapiPerf) PollInstance() (*matrix.Matrix, error) {
 	keyAttr = me.instanceKey
 
 	// hack for workload objects: get instances from Zapi
-	if me.Query == "workload" || me.Query == "workload_detail" || me.Query == "workload_volume" || me.Query == "workload_detail_volume" {
+	if me.Query == objWorkload || me.Query == objWorkloadDetail || me.Query == objWorkloadVolume || me.Query == objWorkloadDetailVolume {
 		request = node.NewXmlS("qos-workload-get-iter")
 		queryElem := request.NewChildS("query", "")
 		infoElem := queryElem.NewChildS("qos-workload-info", "")
-		if me.Query == "workload_volume" || me.Query == "workload_detail_volume" {
+		if me.Query == objWorkloadVolume|| me.Query == objWorkloadDetailVolume {
 			infoElem.NewChildS("workload-class", "autovolume")
 		} else {
 			infoElem.NewChildS("workload-class", "user-defined")
@@ -1202,7 +1207,7 @@ func (me *ZapiPerf) PollInstance() (*matrix.Matrix, error) {
 				logger.Error(me.Prefix, "add instance [%s]: %v", key, err)
 			} else {
 				logger.Debug(me.Prefix, "added new instance [%s%s%s%s]", color.Bold, color.Yellow, key, color.End)
-				if me.Query == "workload" || me.Query == "workload_detail" || me.Query == "workload_volume" || me.Query == "workload_detail_volume" {
+				if me.Query == objWorkload || me.Query == objWorkloadDetail || me.Query == objWorkloadVolume || me.Query == objWorkloadDetailVolume {
 					for label, display := range me.qosLabels {
 						if value := i.GetChildContentS(label); value != "" {
 							instance.SetLabel(display, value)

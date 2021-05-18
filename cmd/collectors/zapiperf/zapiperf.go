@@ -44,7 +44,7 @@ import (
 const (
 	instanceKey   = "uuid"
 	batchSize     = 500
-	latencyIoReqd = 10
+	latencyIoReqd = 100
 	// objects that need special handling
 	objWorkload             = "workload"
 	objWorkloadDetail       = "workload_detail"

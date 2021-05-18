@@ -46,9 +46,9 @@ const (
 	batchSize     = 500
 	latencyIoReqd = 10
 	// objects that need special handling
-	objWorkload = "workload"
-	objWorkloadDetail = "workload_detail"
-	objWorkloadVolume = "workload_volume"
+	objWorkload             = "workload"
+	objWorkloadDetail       = "workload_detail"
+	objWorkloadVolume       = "workload_volume"
 	objWorkloadDetailVolume = "workload_detail_volume"
 )
 
@@ -1143,7 +1143,7 @@ func (me *ZapiPerf) PollInstance() (*matrix.Matrix, error) {
 		request = node.NewXmlS("qos-workload-get-iter")
 		queryElem := request.NewChildS("query", "")
 		infoElem := queryElem.NewChildS("qos-workload-info", "")
-		if me.Query == objWorkloadVolume|| me.Query == objWorkloadDetailVolume {
+		if me.Query == objWorkloadVolume || me.Query == objWorkloadDetailVolume {
 			infoElem.NewChildS("workload-class", "autovolume")
 		} else {
 			infoElem.NewChildS("workload-class", "user-defined")

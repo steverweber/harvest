@@ -223,13 +223,16 @@ func (me *Poller) Init() error {
 		return errors.New(errors.NoCollectorsError, "no collectors")
 	} else {
 
+		// iterate over collectors defined in config for poller
 		for _, c := range collectors.GetChildren() {
 
-			// use default policy for loading templates
+			// if this is a simple list we will use default policy for loading templates
+			// i.e. first load default.yaml, then if custom.yaml exists merge it into default
 			templates := []string{"default.yaml", "custom.yaml"}
 			name := c.GetContentS()
 
-			// or use user-defined templates
+			// if user defined list of templates for the collector
+			// then we will load and merge the templates in the same order
 			if len(c.GetChildren()) != 0 {
 				name = c.GetNameS()
 				templates = c.GetAllChildContentS()

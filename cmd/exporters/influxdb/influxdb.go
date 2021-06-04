@@ -27,6 +27,7 @@ import (
 */
 
 const (
+	defaultURLFmt        = "%sapi/v%s/write?org=%s&bucket=%s&precision=%s"
 	defaultPort          = "8086"
 	detaultTimeout       = 5
 	defaultApiVersion    = "2"
@@ -52,8 +53,8 @@ func (e *InfluxDB) Init() error {
 	}
 
 	var (
-		url, addr, port, bucket, org, v, p string
-		err                                error
+		url, url_raw, addr, port, bucket, org, v, p string
+		err                                         error
 	)
 
 	// check required / optional parameters
@@ -120,6 +121,12 @@ func (e *InfluxDB) Init() error {
 
 	// construct client URL
 	e.url = fmt.Sprintf("%sapi/v%s/write?org=%s&bucket=%s&precision=%s", url, v, org, bucket, p)
+	if url_raw = e.Params.GetChildContentS("url_raw"); url_raw == "" {
+		e.url = fmt.Sprintf(defaultURLFmt, url, v, org, bucket, p)
+	} else {
+		e.url = fmt.Sprintf(url_raw)
+	}
+	e.Logger.Warn().Msgf("url= [%s]", e.url)
 	e.Logger.Debug().Msgf("url= [%s]", e.url)
 
 	// construct HTTP client
